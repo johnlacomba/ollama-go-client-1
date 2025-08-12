@@ -8,10 +8,8 @@ This project is a Go client for communicating with a local Ollama LLM (Large Lan
 ollama-go-client
 ├── src
 │   ├── main.go          # Entry point of the application
-│   ├── client
-│   │   └── client.go    # Client implementation for communicating with the LLM
-│   └── types
-│       └── types.go     # Custom types and constants used in the application
+│   └── client
+│       └── client.go    # Client implementation for communicating with the LLM
 ├── go.mod               # Module definition and dependencies
 └── README.md            # Project documentation
 ```
