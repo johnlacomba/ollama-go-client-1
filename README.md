@@ -14,6 +14,12 @@ ollama-go-client
 └── README.md            # Project documentation
 ```
 
+## Features
+
+- Stores ongoing chat history between the user and the LLM for the duration of the connection.
+- Supplies the entire ongoing chat history as context to the LLM using the `messages` field in each request.
+- Supports streaming responses from the LLM for improved interactivity.
+
 ## Setup Instructions
 
 1. **Clone the repository:**
@@ -40,3 +46,11 @@ ollama-go-client
 ## Usage
 
 After running the application, you can input prompts to communicate with the Ollama LLM. The client will send the prompts to the model and display the responses.
+
+## Contributing
+
+Contributions are welcome! Please open an issue or submit a pull request for any improvements or bug fixes.
+
+## License
+
+This project is licensed under the MIT License. See the LICENSE file for details.
