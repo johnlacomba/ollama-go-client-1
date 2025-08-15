@@ -55,7 +55,7 @@ func NewClient(endpoint string, timeout time.Duration) *Client {
 		Timeout:  timeout,
 		ChatHistory: []Message{
 			{Role: "user", Content: "INITIAL PROMPT"},
-			{Role: "assistant", Content: "RESPONSE FROM INITIAL PROMPT"},
+			{Role: "assistant", Content: "RESPONSE TO INITIAL PROMPT"},
 		},
 	}
 }
@@ -145,4 +145,16 @@ func (c *Client) ListModels() ([]string, error) {
 	}
 
 	return modelNames, nil
+}
+
+// GetModels returns a list of available Ollama models
+func GetModels(w http.ResponseWriter, r *http.Request) {
+	client := NewClient("http://localhost:11434", 300*time.Second)
+	models, err := client.ListModels()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(models)
 }
