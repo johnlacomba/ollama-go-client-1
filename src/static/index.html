@@ -3,92 +3,247 @@
 <head>
     <title>Ollama LLM Interface</title>
     <style>
-        body { font-family: Arial, sans-serif; }
-        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
-        #responseArea { white-space: pre-wrap; word-wrap: break-word; }
-        .timer { color: #666; font-size: 0.9em; }
-        #modelSelector {
-            margin-top: 20px;
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f4f7fa;
+            margin: 0;
+            padding: 0;
         }
-        .model-option {
-            padding: 5px;
+        .container {
+            max-width: 700px;
+            margin: 40px auto 0 auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            padding: 32px 36px 28px 36px;
+        }
+        h1 {
+            color: #2a4d69;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+        #modelSelector {
+            margin: 18px 0 24px 0;
+        }
+        #modelSelector h3 {
+            margin: 0 0 6px 0;
+            color: #4f6d7a;
+            font-size: 1.05em;
+        }
+        #selectedModel {
+            padding: 6px 10px;
+            border-radius: 5px;
+            border: 1px solid #bfc9d1;
+            background: #f0f4f8;
+            color: #2a4d69;
+            font-size: 1em;
+        }
+        #promptForm {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+        #promptInput {
+            flex: 1;
+            resize: none;
+            border-radius: 7px;
+            border: 1px solid #bfc9d1;
+            padding: 10px;
+            font-size: 1em;
+            background: #f8fafc;
+            color: #2a4d69;
+            min-height: 48px;
+            max-height: 120px;
+            box-sizing: border-box;
+        }
+        #promptInput:focus {
+            outline: 2px solid #4f6d7a;
+            background: #fff;
+        }
+        button[type="submit"] {
+            background: linear-gradient(90deg, #4f6d7a 0%, #2a4d69 100%);
+            color: #fff;
+            border: none;
+            border-radius: 7px;
+            padding: 0 22px;
+            font-size: 1em;
             cursor: pointer;
-            border-radius: 3px;
+            transition: background 0.2s;
+            height: 48px;
+        }
+        button[type="submit"]:hover {
+            background: linear-gradient(90deg, #2a4d69 0%, #4f6d7a 100%);
+        }
+        #chatArea {
+            min-height: 120px;
+            background: #f8fafc;
+            border-radius: 7px;
+            border: 1px solid #e3e8ee;
+            padding: 14px 16px;
+            color: #222;
+            margin-bottom: 10px;
+            font-size: 1.08em;
+            line-height: 1.5;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .chat-msg {
+            margin-bottom: 0;
+            padding: 10px 14px;
+            border-radius: 8px;
+            max-width: 90%;
+            word-break: break-word;
+        }
+        .chat-user {
+            background: #e3e8ee;
+            align-self: flex-end;
+            color: #2a4d69;
+        }
+        .chat-bot {
+            background: #d0e6f6;
+            align-self: flex-start;
+            color: #222;
+        }
+        .timer {
+            color: #4f6d7a;
+            font-size: 0.98em;
+            margin-bottom: 4px;
+        }
+        @media (max-width: 600px) {
+            .container {
+                padding: 16px 6px 12px 6px;
+            }
+            #promptForm {
+                flex-direction: column;
+                gap: 6px;
+            }
+            button[type="submit"] {
+                width: 100%;
+                height: 40px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Ollama LLM Interface</h1>
-        <form id="promptForm" onsubmit="handleSubmit(event)">
-            <textarea id="promptInput" rows="4" placeholder="Enter your prompt here..."></textarea><br>
-            <button type="submit">Generate</button>
-        </form>
         <div id="modelSelector">
             <h3>Select Model:</h3>
             <select id="selectedModel" style="width: 200px;">
                 <!-- Models will be populated here -->
             </select>
         </div>
-        <div id="responseArea"></div>
+        <form id="promptForm">
+            <textarea id="promptInput" rows="2" placeholder="Enter your prompt here..."></textarea>
+            <button type="submit">Generate</button>
+        </form>
         <div class="timer" id="timer"></div>
+        <div id="chatArea"></div>
     </div>
 
     <script>
-function handleSubmit(event) {
-    event.preventDefault();
-    const promptInput = document.getElementById('promptInput');
-    const responseArea = document.getElementById('responseArea');
-    const timer = document.getElementById('timer');
-    const selectedModel = document.getElementById('selectedModel').value;
+    // Store chat history as an array of {role, text, duration}
+    let chatHistory = [];
 
-    responseArea.innerHTML = "Generating response...";
-    timer.innerHTML = "";
+    function renderChat() {
+        const chatArea = document.getElementById('chatArea');
+        chatArea.innerHTML = '';
+        // Render from first to last (top to bottom)
+        for (let i = 0; i < chatHistory.length; i++) {
+            const msg = chatHistory[i];
+            const div = document.createElement('div');
+            div.className = 'chat-msg ' + (msg.role === 'user' ? 'chat-user' : 'chat-bot');
+            div.innerHTML = msg.text;
+            if (msg.role === 'bot' && msg.duration) {
+                div.innerHTML += `<div class="timer" style="font-size:0.92em;margin-top:4px;">⏱️ ${msg.duration}</div>`;
+            }
+            chatArea.appendChild(div);
+        }
+    }
 
-    const startTime = new Date().getTime();
+    function handleSubmit(event) {
+        event.preventDefault();
+        const promptInput = document.getElementById('promptInput');
+        const selectedModel = document.getElementById('selectedModel').value;
+        const timer = document.getElementById('timer');
 
-    fetch('/api/generate', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: `model=${encodeURIComponent(selectedModel)}&prompt=${encodeURIComponent(promptInput.value)}`,
-    })
-    .then(response => {
-        if (!response.ok) throw new Error("Server error");
-        return response.json();
-    })
-    .then(data => {
-        const endTime = new Date().getTime();
-        const duration = (endTime - startTime) / 1000;
-        responseArea.textContent = data.text;
-        timer.innerHTML = `Generation took: ${duration.toFixed(2)} seconds`;
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        responseArea.textContent = 'Error generating response';
-    });
+        if (!promptInput.value.trim()) {
+            timer.textContent = "Please enter a prompt.";
+            return;
+        }
 
-    promptInput.value = '';
-}
+        timer.innerHTML = "Generating response...";
 
-function initModelSelector() {
-    fetch('/api/tags')
-        .then(response => response.json())
-        .then(models => {
-            const modelSelect = document.getElementById('selectedModel');
-            modelSelect.innerHTML = "";
-            models.forEach(model => {
-                const option = document.createElement('option');
-                option.value = model;
-                option.textContent = model;
-                modelSelect.appendChild(option);
-            });
+        // Insert user message at the top
+        chatHistory.unshift({ role: 'user', text: promptInput.value });
+
+        renderChat();
+
+        const startTime = new Date().getTime();
+
+        fetch('/api/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `model=${encodeURIComponent(selectedModel)}&prompt=${encodeURIComponent(promptInput.value)}`,
         })
-        .catch(error => console.error('Error fetching models:', error));
-}
+        .then(response => {
+            if (!response.ok) throw new Error("Server error");
+            return response.json();
+        })
+        .then(data => {
+            const endTime = new Date().getTime();
+            const duration = (endTime - startTime) / 1000;
+            timer.innerHTML = `Generation took: ${duration.toFixed(2)} seconds`;
+            // Insert bot response at the top
+            chatHistory.unshift({ role: 'bot', text: data.text, duration: `${duration.toFixed(2)}s` });
+            renderChat();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            timer.textContent = 'Error generating response';
+            chatHistory.unshift({ role: 'bot', text: 'Error generating response', duration: null });
+            renderChat();
+        });
 
-document.addEventListener('DOMContentLoaded', initModelSelector);
-</script>
+        promptInput.value = '';
+    }
+
+    function initModelSelector() {
+        fetch('/api/tags')
+            .then(response => response.json())
+            .then(models => {
+                const modelSelect = document.getElementById('selectedModel');
+                modelSelect.innerHTML = "";
+                models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model;
+                    option.textContent = model;
+                    modelSelect.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error fetching models:', error));
+    }
+
+    // Submit form on Enter, not newline
+    document.addEventListener('DOMContentLoaded', function() {
+        initModelSelector();
+        const promptInput = document.getElementById('promptInput');
+        const promptForm = document.getElementById('promptForm');
+        promptInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                promptForm.requestSubmit();
+            }
+        });
+        promptForm.addEventListener('submit', handleSubmit);
+        renderChat();
+    });
+    </script>
 </body>
 </html>

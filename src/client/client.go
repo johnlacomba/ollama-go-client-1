@@ -20,20 +20,24 @@ type Message struct {
 	Content string `json:"content"`
 }
 
-type Request struct {
-	Model            string    `json:"model"`
-	Prompt           string    `json:"prompt"`
-	StreamResponse   bool      `json:"stream,omitempty"`
-	Messages         []Message `json:"messages,omitempty"`
-	Temperature      float32   `json:"temperature,omitempty"` // Add temperature parameter
-	TopP             float32   `json:"top_p,omitempty"`       // Add top_p parameter
-	FrequencyPenalty float32   `json:"frequency_penalty,omitempty"`
-	PresencePenalty  float32   `json:"presence_penalty,omitempty"`
-	MixtureSeed      int64     `json:"mixture_seed,omitempty"`
-	Seed             int64     `json:"seed,omitempty"`
-	BestOf           int       `json:"best_of,omitempty"`
-	Logprobs         int       `json:"logprobs,omitempty"`
+type Options struct {
+	Temperature      float32 `json:"temperature,omitempty"`
+	TopP             float32 `json:"top_p,omitempty"`
+	FrequencyPenalty float32 `json:"frequency_penalty,omitempty"`
+	PresencePenalty  float32 `json:"presence_penalty,omitempty"`
+	MixtureSeed      int64   `json:"mixture_seed,omitempty"`
+	Seed             int64   `json:"seed,omitempty"`
+	BestOf           int     `json:"best_of,omitempty"`
+	Logprobs         int     `json:"logprobs,omitempty"`
 	// Add other parameters as needed
+}
+
+type Request struct {
+	Model          string    `json:"model"`
+	Prompt         string    `json:"prompt"`
+	StreamResponse bool      `json:"stream,omitempty"`
+	Messages       []Message `json:"messages,omitempty"`
+	Options        Options   `json:"options,omitempty"`
 }
 
 type Response struct {
@@ -65,18 +69,20 @@ func (c *Client) SendRequest(model string, prompt string, temperature float32, t
 	c.ChatHistory = append(c.ChatHistory, Message{Role: "user", Content: prompt})
 
 	reqBody := Request{
-		Model:            model,
-		Prompt:           prompt,
-		StreamResponse:   true, // Enable streaming
-		Temperature:      temperature,
-		TopP:             topP,
-		FrequencyPenalty: frequencyPenalty,
-		PresencePenalty:  presencePenalty,
-		MixtureSeed:      mixtureSeed,
-		Seed:             seed,
-		BestOf:           bestOf,
-		Logprobs:         logprobs,
-		Messages:         c.ChatHistory,
+		Model:          model,
+		Prompt:         prompt,
+		StreamResponse: true, // Enable streaming
+		Messages:       c.ChatHistory,
+		Options: Options{
+			Temperature:      temperature,
+			TopP:             topP,
+			FrequencyPenalty: frequencyPenalty,
+			PresencePenalty:  presencePenalty,
+			MixtureSeed:      mixtureSeed,
+			Seed:             seed,
+			BestOf:           bestOf,
+			Logprobs:         logprobs,
+		},
 	}
 	body, err := json.Marshal(reqBody)
 	if err != nil {
