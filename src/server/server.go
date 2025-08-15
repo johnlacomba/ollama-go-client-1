@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,7 +13,7 @@ import (
 
 const port = ":8080"
 
-var chatHistories = make(map[string][]client.Message)
+var chatHistories = make(map[string]map[string][]client.Message)
 
 func main() {
 	// Read index.html content
@@ -44,11 +45,14 @@ func main() {
 			return
 		}
 
-		// Use a simple session key (e.g., client IP) for demo purposes
 		sessionKey := r.RemoteAddr
 
-		// Get or initialize chat history
-		history, ok := chatHistories[sessionKey]
+		// Get or initialize per-model chat history for this session
+		modelHistories, ok := chatHistories[sessionKey]
+		if !ok {
+			modelHistories = make(map[string][]client.Message)
+		}
+		history, ok := modelHistories[model]
 		if !ok {
 			history = client.NewClient(endpoint, timeout).ChatHistory
 		}
@@ -73,11 +77,12 @@ func main() {
 
 		// Append assistant's response to history
 		history = append(history, client.Message{Role: "assistant", Content: response.Message.Content})
-		chatHistories[sessionKey] = history
+		modelHistories[model] = history
+		chatHistories[sessionKey] = modelHistories
 
 		duration := time.Since(startTime)
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"text":%q,"duration":"%v"}`, response.Message.Content, duration)
+		fmt.Fprintf(w, `{"text":%q,"duration":"%v","history":%s}`, response.Message.Content, duration, toJSON(history))
 	})
 
 	// This is correct: use the package-level function
@@ -85,4 +90,10 @@ func main() {
 
 	log.Printf("Starting server on %s", port)
 	http.ListenAndServe(port, nil)
+}
+
+// Helper to marshal history to JSON
+func toJSON(history []client.Message) string {
+	b, _ := json.Marshal(history)
+	return string(b)
 }

@@ -174,17 +174,18 @@
 
     <script>
     // Store chat history as an array of {role, text, duration}
-    let chatHistory = [];
+    let modelHistories = {};
+    let selectedModel = "";
 
     function renderChat() {
         const chatArea = document.getElementById('chatArea');
         chatArea.innerHTML = '';
-        // Render from first to last (top to bottom)
+        const chatHistory = modelHistories[selectedModel] || [];
         for (let i = 0; i < chatHistory.length; i++) {
             const msg = chatHistory[i];
             const div = document.createElement('div');
             div.className = 'chat-msg ' + (msg.role === 'user' ? 'chat-user' : 'chat-bot');
-            div.innerHTML = msg.text;
+            div.innerHTML = msg.content || msg.text;
             if (msg.role === 'bot' && msg.duration) {
                 div.innerHTML += `<div class="timer">⏱️ ${msg.duration}</div>`;
             }
@@ -195,19 +196,16 @@
     function handleSubmit(event) {
         event.preventDefault();
         const promptInput = document.getElementById('promptInput');
-        const selectedModel = document.getElementById('selectedModel').value;
-
-        if (!promptInput.value.trim()) {
+        if (!promptInput.value.trim() || !selectedModel) {
             return;
         }
-
-        // Insert user message at the top
-        chatHistory.unshift({ role: 'user', text: promptInput.value });
+        // Add user message to history for this model
+        if (!modelHistories[selectedModel]) modelHistories[selectedModel] = [];
+        modelHistories[selectedModel].unshift({ role: 'user', text: promptInput.value });
         renderChat();
 
-        // Insert a placeholder for the bot response at the top
         let botMsg = { role: 'bot', text: '', duration: null };
-        chatHistory.unshift(botMsg);
+        modelHistories[selectedModel].unshift(botMsg);
         renderChat();
 
         const startTime = new Date().getTime();
@@ -219,15 +217,16 @@
             },
             body: `model=${encodeURIComponent(selectedModel)}&prompt=${encodeURIComponent(promptInput.value)}`,
         })
-        .then(response => {
-            if (!response.ok) throw new Error("Server error");
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
             const endTime = new Date().getTime();
             const duration = (endTime - startTime) / 1000;
             botMsg.text = data.text;
             botMsg.duration = `${duration.toFixed(2)}s`;
+            // Update local history with server's authoritative history
+            if (data.history) {
+                modelHistories[selectedModel] = data.history.reverse();
+            }
             renderChat();
         })
         .catch(error => {
@@ -237,6 +236,11 @@
 
         promptInput.value = '';
         autoExpandTextarea(promptInput);
+    }
+
+    function setModel(model) {
+        selectedModel = model;
+        renderChat();
     }
 
     function initModelSelector() {
@@ -251,6 +255,9 @@
                     option.textContent = model;
                     modelSelect.appendChild(option);
                 });
+                if (models.length > 0) {
+                    setModel(models[0]);
+                }   
             })
             .catch(error => console.error('Error fetching models:', error));
     }
