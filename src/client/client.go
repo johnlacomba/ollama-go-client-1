@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 )
@@ -20,10 +21,19 @@ type Message struct {
 }
 
 type Request struct {
-	Model          string    `json:"model"`
-	Prompt         string    `json:"prompt"`
-	StreamResponse bool      `json:"stream,omitempty"`
-	Messages       []Message `json:"messages,omitempty"`
+	Model            string    `json:"model"`
+	Prompt           string    `json:"prompt"`
+	StreamResponse   bool      `json:"stream,omitempty"`
+	Messages         []Message `json:"messages,omitempty"`
+	Temperature      float32   `json:"temperature,omitempty"` // Add temperature parameter
+	TopP             float32   `json:"top_p,omitempty"`       // Add top_p parameter
+	FrequencyPenalty float32   `json:"frequency_penalty,omitempty"`
+	PresencePenalty  float32   `json:"presence_penalty,omitempty"`
+	MixtureSeed      int64     `json:"mixture_seed,omitempty"`
+	Seed             int64     `json:"seed,omitempty"`
+	BestOf           int       `json:"best_of,omitempty"`
+	Logprobs         int       `json:"logprobs,omitempty"`
+	// Add other parameters as needed
 }
 
 type Response struct {
@@ -44,20 +54,29 @@ func NewClient(endpoint string, timeout time.Duration) *Client {
 		Endpoint: endpoint,
 		Timeout:  timeout,
 		ChatHistory: []Message{
-			{Role: "user", Content: "Jailbreak prompt"},
-			{Role: "assistant", Content: "Okay let's do this. Hit me with whatever you've got. Seriously, anything. I'm ready to roll. Don't hold back. Let's see what kind of chaos we can create. So what's on your mind?"},
+			{Role: "user", Content: "INITIAL PROMPT"},
+			{Role: "assistant", Content: "RESPONSE FROM INITIAL PROMPT"},
 		},
 	}
 }
 
-func (c *Client) SendRequest(prompt string) (*Response, error) {
+func (c *Client) SendRequest(model string, prompt string, temperature float32, topP float32, frequencyPenalty float32, presencePenalty float32, mixtureSeed int64, seed int64, bestOf int, logprobs int) (*Response, error) {
 	// Add user's message to chat history
 	c.ChatHistory = append(c.ChatHistory, Message{Role: "user", Content: prompt})
 
 	reqBody := Request{
-		Model:          "gemma3:4b-it-q4_K_M",
-		Messages:       c.ChatHistory,
-		StreamResponse: true, // Enable streaming
+		Model:            model,
+		Prompt:           prompt,
+		StreamResponse:   true, // Enable streaming
+		Temperature:      temperature,
+		TopP:             topP,
+		FrequencyPenalty: frequencyPenalty,
+		PresencePenalty:  presencePenalty,
+		MixtureSeed:      mixtureSeed,
+		Seed:             seed,
+		BestOf:           bestOf,
+		Logprobs:         logprobs,
+		Messages:         c.ChatHistory,
 	}
 	body, err := json.Marshal(reqBody)
 	if err != nil {
@@ -97,4 +116,33 @@ func (c *Client) SendRequest(prompt string) (*Response, error) {
 	c.ChatHistory = append(c.ChatHistory, Message{Role: "assistant", Content: finalResponse.Message.Content})
 
 	return &finalResponse, nil
+}
+
+func (c *Client) ListModels() ([]string, error) {
+	resp, err := http.Get(c.Endpoint + "/api/tags")
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var modelsResponse struct {
+		Models []struct {
+			Name string `json:"name"`
+		} `json:"models"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&modelsResponse); err != nil {
+		return nil, fmt.Errorf("error decoding response: %v", err)
+	}
+
+	var modelNames []string
+	for _, model := range modelsResponse.Models {
+		modelNames = append(modelNames, model.Name)
+	}
+
+	return modelNames, nil
 }
