@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -13,7 +15,7 @@ import (
 
 const port = ":8080"
 
-var chatHistories = make(map[string]map[string][]client.Message)
+var chatHistories = make(map[string][]client.Message)
 
 func main() {
 	// Read index.html content
@@ -46,43 +48,85 @@ func main() {
 		}
 
 		sessionKey := r.RemoteAddr
-
-		// Get or initialize per-model chat history for this session
-		modelHistories, ok := chatHistories[sessionKey]
-		if !ok {
-			modelHistories = make(map[string][]client.Message)
-		}
-		history, ok := modelHistories[model]
+		history, ok := chatHistories[sessionKey]
 		if !ok {
 			history = client.NewClient(endpoint, timeout).ChatHistory
 		}
-
-		// Append the new user message
 		history = append(history, client.Message{Role: "user", Content: prompt})
 
-		// Create a client with this history
 		ollamaClient := client.NewClient(endpoint, timeout)
 		ollamaClient.ChatHistory = history
 
-		response, err := ollamaClient.SendRequest(
-			model, prompt,
-			0.7, 0.95, 0.0, 0.0, 0, 0, 0, 0,
-		)
-		if err != nil {
-			log.Printf("Error generating response: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintln(w, "Error generating response")
+		// Set headers for SSE
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
 			return
 		}
 
-		// Append assistant's response to history
-		history = append(history, client.Message{Role: "assistant", Content: response.Message.Content})
-		modelHistories[model] = history
-		chatHistories[sessionKey] = modelHistories
+		// Prepare request body for streaming
+		reqBody := client.Request{
+			Model:          model,
+			Prompt:         prompt,
+			StreamResponse: true,
+			Messages:       ollamaClient.ChatHistory,
+			Options: client.Options{
+				Temperature:      0.7,
+				TopP:             0.95,
+				FrequencyPenalty: 0.0,
+				PresencePenalty:  0.0,
+				MixtureSeed:      0,
+				Seed:             0,
+				BestOf:           0,
+				Logprobs:         0,
+			},
+		}
+		body, err := json.Marshal(reqBody)
+		if err != nil {
+			http.Error(w, "Failed to marshal request", http.StatusInternalServerError)
+			return
+		}
+
+		httpClient := &http.Client{Timeout: timeout}
+		resp, err := httpClient.Post(endpoint+"/api/chat", "application/json", bytes.NewBuffer(body))
+		if err != nil {
+			http.Error(w, "Failed to contact Ollama backend", http.StatusInternalServerError)
+			return
+		}
+		defer resp.Body.Close()
+
+		// Stream tokens as they arrive
+		scanner := bufio.NewScanner(resp.Body)
+		var assistantMsg string
+		for scanner.Scan() {
+			line := scanner.Bytes()
+			var r client.Response
+			if err := json.Unmarshal(line, &r); err != nil {
+				continue // skip malformed lines
+			}
+			if r.Message.Content != "" {
+				assistantMsg += r.Message.Content
+				fmt.Fprintf(w, "data: %s\n\n", r.Message.Content)
+				flusher.Flush()
+			}
+			if r.Done {
+				break
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			log.Printf("Scanner error: %v", err)
+		}
+
+		// Save assistant's response to chat history
+		history = append(history, client.Message{Role: "assistant", Content: assistantMsg})
+		chatHistories[sessionKey] = history
 
 		duration := time.Since(startTime)
-		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"text":%q,"duration":"%v","history":%s}`, response.Message.Content, duration, toJSON(history))
+		fmt.Fprintf(w, "event: done\ndata: {\"duration\":\"%v\"}\n\n", duration)
+		flusher.Flush()
 	})
 
 	// This is correct: use the package-level function
@@ -90,10 +134,4 @@ func main() {
 
 	log.Printf("Starting server on %s", port)
 	http.ListenAndServe(port, nil)
-}
-
-// Helper to marshal history to JSON
-func toJSON(history []client.Message) string {
-	b, _ := json.Marshal(history)
-	return string(b)
 }
