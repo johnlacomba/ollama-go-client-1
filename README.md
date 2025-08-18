@@ -1,6 +1,6 @@
 # Ollama Go Client
 
-This project is a Go client for communicating with a local Ollama LLM (Large Language Model). It provides a simple web interface to send prompts and receive responses from the model.
+This project is a Go client for communicating with a local Ollama LLM (Large Language Model). It provides a web interface to send prompts and receive *streaming* responses from the model.
 
 ## Project Structure
 
@@ -8,53 +8,91 @@ This project is a Go client for communicating with a local Ollama LLM (Large Lan
 ollama-go-client-1
 ├── src
 │   ├── static
-│   │   └── index.html       # Web UI for interacting with the LLM
+│   │   └── index.html       # Web UI (SSE streaming)
 │   ├── client
-│   │   └── client.go        # Client implementation for communicating with the LLM
+│   │   └── client.go        # Client wrapper (chat history + request builder)
 │   └── server
-│       └── server.go        # Web server entry point
-├── go.mod                   # Module definition and dependencies
-└── README.md                # Project documentation
+│       └── server.go        # HTTP server + /api/chat (SSE) + /api/tags
+├── go.mod
+└── README.md
 ```
 
 ## Features
 
-- Web-based chat interface for interacting with the Ollama LLM.
-- Stores ongoing chat history between the user and the LLM for the duration of the connection.
-- Supplies the entire ongoing chat history as context to the LLM using the `messages` field in each request.
-- Supports streaming responses from the LLM for improved interactivity.
-- Allows selection of available models from a dropdown menu in the web UI.
-- Displays the time taken for each prompt to generate a response.
+- Web-based chat interface.
+- Token-by-token streaming via Server-Sent Events (SSE) from `/api/chat`.
+- Per-session in‑memory chat history (clears on page reload or server restart).
+- Full chat history (including the first two seeded messages) always sent as context.
+- First two seeded messages (system-style priming) are *not* rendered to the user.
+- Model list dynamically loaded from `/api/tags`.
+- Auto-expanding prompt input; Enter submits (Shift+Enter for newline blocked).
+- Lightweight, dependency-free (std lib + Ollama).
 
-## Setup Instructions
+## How Streaming Works
 
-1. **Clone the repository:**
-   ```sh
-   git clone <repository-url>
-   cd ollama-go-client-1
-   ```
+1. Browser opens an `EventSource` to:  
+   `GET /api/chat?model=<model>&prompt=<urlencoded prompt>`
+2. Server forwards full chat history + new prompt to Ollama's `/api/chat` with `"stream": true`.
+3. Server streams each partial chunk back as `data:` lines.
+4. A final `event: done` message includes total generation duration.
+5. Frontend accumulates chunks into the latest assistant message.
 
-2. **Install dependencies:**
-   ```sh
-   go mod tidy
-   ```
+## API Endpoints
 
-3. **Run the web server:**
-   ```sh
-   go run src/server/server.go
-   ```
+- `GET /`  
+  Serves `index.html`.
+- `GET /api/tags`  
+  Returns JSON array of available model names.
+- `GET /api/chat?model=<name>&prompt=<text>`  
+  SSE stream of model output (token chunks). Final event named `done` contains:  
+  `{"duration":"<Go duration string>"}`
 
-4. **Open the web interface:**
-   - Visit `http://localhost:8080` in your browser.
+Example SSE stream (simplified):
+```
+data: Hel
+data: lo 
+data: world
+event: done
+data: {"duration":"1.237s"}
+```
 
-## Usage
+## Setup
 
-- Enter your prompt in the text area and select a model from the dropdown.
-- Click "Generate" to send your prompt to the selected model.
-- The response will appear below, along with the time taken to generate it.
+```sh
+go mod tidy
+go run src/server/server.go
+```
 
-## Notes
+Visit: `http://localhost:8080`
 
-- The backend Go server listens on port **8080** and serves the web interface and API endpoints.
-- The Ollama LLM backend must be running and accessible at `http://localhost:11434`.
-- The legacy CLI interface is no longer included; use the web interface
+Ensure Ollama is running locally (default: `http://localhost:11434`).
+
+## Chat History Behavior
+
+- Stored per remote address only (simple demo approach).
+- Not persisted; restarting or reloading resets context.
+- Hidden seed messages still influence generation.
+
+## Customization
+
+Adjust generation parameters in `server.go` (inside `/api/chat` handler):
+```
+Temperature: 0.7
+TopP:        0.95
+...
+```
+
+Modify initial priming messages in `client.NewClient()`.
+
+## Notes / Future Ideas
+
+- Add real session IDs (e.g., cookie or UUID) instead of `RemoteAddr`.
+- Add per-model independent histories (map[session][model]) if needed.
+- Add cancel support (client closes EventSource).
+- Parameter controls in UI (temperature, top_p, etc.).
+- Persist history (Redis / BoltDB) if required.
+
+## Requirements
+
+- Go 1.18+
+- Local Ollama installation and
