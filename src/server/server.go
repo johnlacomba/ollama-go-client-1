@@ -10,12 +10,12 @@ import (
 	"os"
 	"time"
 
-	"ollama-go-client/src/client"
+	"ollama-go-client/src/ollamaAPIWrapper"
 )
 
 const port = ":8080"
 
-var chatHistories = make(map[string][]client.Message)
+var chatHistories = make(map[string][]ollamaAPIWrapper.Message)
 
 func main() {
 	// Read index.html content
@@ -50,11 +50,11 @@ func main() {
 		sessionKey := r.RemoteAddr
 		history, ok := chatHistories[sessionKey]
 		if !ok {
-			history = client.NewClient(endpoint, timeout).ChatHistory
+			history = ollamaAPIWrapper.NewClient(endpoint, timeout).ChatHistory
 		}
-		history = append(history, client.Message{Role: "user", Content: prompt})
+		history = append(history, ollamaAPIWrapper.Message{Role: "user", Content: prompt})
 
-		ollamaClient := client.NewClient(endpoint, timeout)
+		ollamaClient := ollamaAPIWrapper.NewClient(endpoint, timeout)
 		ollamaClient.ChatHistory = history
 
 		// Set headers for SSE
@@ -68,12 +68,12 @@ func main() {
 		}
 
 		// Prepare request body for streaming
-		reqBody := client.Request{
+		reqBody := ollamaAPIWrapper.Request{
 			Model:          model,
 			Prompt:         prompt,
 			StreamResponse: true,
 			Messages:       ollamaClient.ChatHistory,
-			Options: client.Options{
+			Options: ollamaAPIWrapper.Options{
 				Temperature:      0.7,
 				TopP:             0.95,
 				FrequencyPenalty: 0.0,
@@ -103,7 +103,7 @@ func main() {
 		var assistantMsg string
 		for scanner.Scan() {
 			line := scanner.Bytes()
-			var r client.Response
+			var r ollamaAPIWrapper.Response
 			if err := json.Unmarshal(line, &r); err != nil {
 				continue
 			}
@@ -128,7 +128,7 @@ func main() {
 		}
 
 		// Save assistant's response to chat history
-		history = append(history, client.Message{Role: "assistant", Content: assistantMsg})
+		history = append(history, ollamaAPIWrapper.Message{Role: "assistant", Content: assistantMsg})
 		chatHistories[sessionKey] = history
 
 		duration := time.Since(startTime)
@@ -141,7 +141,7 @@ func main() {
 	})
 
 	// This is correct: use the package-level function
-	http.HandleFunc("/api/tags", client.GetModels)
+	http.HandleFunc("/api/tags", ollamaAPIWrapper.GetModels)
 
 	log.Printf("Starting server on %s", port)
 	http.ListenAndServe(port, nil)
