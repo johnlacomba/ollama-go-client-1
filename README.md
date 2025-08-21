@@ -95,4 +95,4 @@ Modify initial priming messages in `client.NewClient()`.
 ## Requirements
 
 - Go 1.18+
-- Local Ollama installation and
+- Local Ollama installation
