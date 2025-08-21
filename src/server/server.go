@@ -105,11 +105,18 @@ func main() {
 			line := scanner.Bytes()
 			var r client.Response
 			if err := json.Unmarshal(line, &r); err != nil {
-				continue // skip malformed lines
+				continue
 			}
 			if r.Message.Content != "" {
 				assistantMsg += r.Message.Content
-				fmt.Fprintf(w, "data: %s\n\n", r.Message.Content)
+
+				// Wrap token in JSON so newlines / tabs are preserved safely
+				chunk := struct {
+					Token string `json:"token"`
+				}{Token: r.Message.Content}
+
+				b, _ := json.Marshal(chunk)
+				fmt.Fprintf(w, "data: %s\n\n", b)
 				flusher.Flush()
 			}
 			if r.Done {
@@ -125,7 +132,11 @@ func main() {
 		chatHistories[sessionKey] = history
 
 		duration := time.Since(startTime)
-		fmt.Fprintf(w, "event: done\ndata: {\"duration\":\"%v\"}\n\n", duration)
+		donePayload := struct {
+			Duration string `json:"duration"`
+		}{Duration: duration.String()}
+		b, _ := json.Marshal(donePayload)
+		fmt.Fprintf(w, "event: done\ndata: %s\n\n", b)
 		flusher.Flush()
 	})
 

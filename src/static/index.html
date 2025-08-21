@@ -118,6 +118,8 @@
             max-width: 90%;
             word-break: break-word;
             font-size: 1em;
+            white-space: pre-wrap;   /* preserve \n and wrap long lines */
+            tab-size: 4;
         }
         .chat-user {
             background: #e3e8ee;
@@ -184,10 +186,8 @@
             const msg = chatHistory[i];
             const div = document.createElement('div');
             div.className = 'chat-msg ' + (msg.role === 'user' ? 'chat-user' : 'chat-bot');
-            div.innerHTML = msg.text;
-            if (msg.role === 'bot' && msg.duration) {
-                div.innerHTML += `<div class="timer">⏱️ ${msg.duration}</div>`;
-            }
+            // Use textContent so tokens with special chars are literal (prevent HTML injection)
+            div.textContent = msg.text + (msg.role === 'bot' && msg.duration ? `\n⏱ ${msg.duration}` : '');
             chatArea.appendChild(div);
         }
     }
@@ -196,43 +196,49 @@
         event.preventDefault();
         const promptInput = document.getElementById('promptInput');
         const selectedModel = document.getElementById('selectedModel').value;
+        if (!promptInput.value.trim()) return;
 
-        if (!promptInput.value.trim()) {
-            return;
-        }
-
-        // Insert user message at the top
         chatHistory.unshift({ role: 'user', text: promptInput.value });
         renderChat();
 
-        // Insert a placeholder for the bot response at the top
         let botMsg = { role: 'bot', text: '', duration: null };
         chatHistory.unshift(botMsg);
         renderChat();
 
-        // Build the SSE URL with query params
         const params = new URLSearchParams({
             model: selectedModel,
             prompt: promptInput.value
         });
         const evtSource = new EventSource('/api/chat?' + params.toString());
+        const startTime = performance.now();
 
         evtSource.onmessage = function(event) {
-            botMsg.text += event.data;
-            renderChat();
+            try {
+                const chunk = JSON.parse(event.data); // {token:"..."}
+                if (chunk.token) {
+                    botMsg.text += chunk.token;
+                    renderChat();
+                }
+            } catch {
+                // ignore malformed chunk
+            }
         };
 
         evtSource.addEventListener('done', function(event) {
             try {
-                const data = JSON.parse(event.data);
-                botMsg.duration = data.duration.replace('ms', 'ms');
-            } catch {}
+                const meta = JSON.parse(event.data);
+                const duration = (performance.now() - startTime) / 1000;
+                botMsg.duration = meta.duration || `${duration.toFixed(2)}s`;
+            } catch {
+                const duration = (performance.now() - startTime) / 1000;
+                botMsg.duration = `${duration.toFixed(2)}s`;
+            }
             renderChat();
             evtSource.close();
         });
 
         evtSource.onerror = function() {
-            botMsg.text += "\n[Error receiving response]";
+            botMsg.text += "\n[Stream error]";
             renderChat();
             evtSource.close();
         };
