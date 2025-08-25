@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings" // Import strings package
 	"time"
 
 	"ollama-go-client/src/ollamaAPIWrapper"
@@ -16,6 +17,13 @@ import (
 const port = ":8080"
 
 var chatHistories = make(map[string][]ollamaAPIWrapper.Message)
+
+// Define a struct for the incoming chat request payload
+type chatRequestPayload struct {
+	Model  string `json:"model"`
+	Prompt string `json:"prompt"`
+	Image  string `json:"image,omitempty"` // Base64 encoded image
+}
 
 func main() {
 	// Read index.html content
@@ -32,18 +40,29 @@ func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, indexHTMLStr)
 	})
+
 	http.HandleFunc("/api/chat", func(w http.ResponseWriter, r *http.Request) {
-		startTime := time.Now()
-		if err := r.ParseForm(); err != nil {
-			log.Printf("Error parsing form: %v", err)
-			w.WriteHeader(http.StatusBadRequest)
+		// We must use POST to send a JSON body with an image
+		if r.Method != http.MethodPost {
+			http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		prompt := r.FormValue("prompt")
-		model := r.FormValue("model")
-		if prompt == "" || model == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintln(w, "Prompt and model are required")
+
+		startTime := time.Now()
+
+		// Decode the JSON payload from the request body
+		var payload chatRequestPayload
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			http.Error(w, "Error decoding request body", http.StatusBadRequest)
+			return
+		}
+
+		if payload.Prompt == "" && payload.Image == "" {
+			http.Error(w, "A prompt or an image is required", http.StatusBadRequest)
+			return
+		}
+		if payload.Model == "" {
+			http.Error(w, "Model is required", http.StatusBadRequest)
 			return
 		}
 
@@ -52,12 +71,24 @@ func main() {
 		if !ok {
 			history = ollamaAPIWrapper.NewClient(endpoint, timeout).ChatHistory
 		}
-		history = append(history, ollamaAPIWrapper.Message{Role: "user", Content: prompt})
+
+		// Create the user message, with an image if present
+		userMessage := ollamaAPIWrapper.Message{Role: "user", Content: payload.Prompt}
+		if payload.Image != "" {
+			// Ollama expects the raw base64 data, so we strip the data URI prefix
+			// e.g., "data:image/png;base64,iVBORw0KGgo..." -> "iVBORw0KGgo..."
+			base64Data := payload.Image
+			if i := strings.Index(base64Data, ","); i != -1 {
+				base64Data = base64Data[i+1:]
+			}
+			userMessage.Images = []string{base64Data}
+		}
+		history = append(history, userMessage)
 
 		ollamaClient := ollamaAPIWrapper.NewClient(endpoint, timeout)
 		ollamaClient.ChatHistory = history
 
-		// Set headers for SSE
+		// Set headers for SSE streaming
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
@@ -67,22 +98,12 @@ func main() {
 			return
 		}
 
-		// Prepare request body for streaming
+		// Prepare request body for Ollama
 		reqBody := ollamaAPIWrapper.Request{
-			Model:          model,
-			Prompt:         prompt,
+			Model:          payload.Model,
 			StreamResponse: true,
 			Messages:       ollamaClient.ChatHistory,
-			Options: ollamaAPIWrapper.Options{
-				Temperature:      0.7,
-				TopP:             0.95,
-				FrequencyPenalty: 0.0,
-				PresencePenalty:  0.0,
-				MixtureSeed:      0,
-				Seed:             0,
-				BestOf:           0,
-				Logprobs:         0,
-			},
+			Options:        ollamaAPIWrapper.Options{Temperature: 0.7, TopP: 0.95},
 		}
 		body, err := json.Marshal(reqBody)
 		if err != nil {
@@ -98,7 +119,7 @@ func main() {
 		}
 		defer resp.Body.Close()
 
-		// Stream tokens as they arrive
+		// Stream tokens back to the client
 		scanner := bufio.NewScanner(resp.Body)
 		var assistantMsg string
 		for scanner.Scan() {
@@ -109,12 +130,9 @@ func main() {
 			}
 			if r.Message.Content != "" {
 				assistantMsg += r.Message.Content
-
-				// Wrap token in JSON so newlines / tabs are preserved safely
 				chunk := struct {
 					Token string `json:"token"`
 				}{Token: r.Message.Content}
-
 				b, _ := json.Marshal(chunk)
 				fmt.Fprintf(w, "data: %s\n\n", b)
 				flusher.Flush()
@@ -127,10 +145,11 @@ func main() {
 			log.Printf("Scanner error: %v", err)
 		}
 
-		// Save assistant's response to chat history
+		// Save the complete assistant response to history
 		history = append(history, ollamaAPIWrapper.Message{Role: "assistant", Content: assistantMsg})
 		chatHistories[sessionKey] = history
 
+		// Send the final 'done' event
 		duration := time.Since(startTime)
 		donePayload := struct {
 			Duration string `json:"duration"`
@@ -140,9 +159,7 @@ func main() {
 		flusher.Flush()
 	})
 
-	// This is correct: use the package-level function
 	http.HandleFunc("/api/tags", ollamaAPIWrapper.GetModels)
-
 	log.Printf("Starting server on %s", port)
 	http.ListenAndServe(port, nil)
 }

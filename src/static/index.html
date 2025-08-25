@@ -30,6 +30,8 @@
             z-index: 10;
             padding-bottom: 8px;
             border-bottom: 1px solid #e3e8ee;
+        }
+        .controls-grid {
             display: flex;
             flex-wrap: wrap;
             align-items: center;
@@ -56,10 +58,36 @@
             font-size: 0.98em;
             height: 32px;
         }
+        #imagePreview {
+            position: relative;
+            margin-top: 8px;
+            width: fit-content;
+        }
+        #imagePreview img {
+            max-width: 100px;
+            max-height: 100px;
+            border-radius: 6px;
+            border: 1px solid #bfc9d1;
+        }
+        #removeImageBtn {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #fff;
+            border: 1px solid #bfc9d1;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            line-height: 18px;
+            text-align: center;
+            padding: 0;
+        }
         #promptForm {
             display: flex;
             gap: 6px;
-            margin: 0;
+            margin-top: 8px;
             flex: 1;
         }
         #promptInput {
@@ -74,7 +102,7 @@
             min-height: 32px;
             max-height: 160px;
             box-sizing: border-box;
-            overflow-y: hidden; /* Hide scroll, let it grow */
+            overflow-y: hidden;
             transition: min-height 0.1s;
         }
         #promptInput:focus {
@@ -118,8 +146,14 @@
             max-width: 90%;
             word-break: break-word;
             font-size: 1em;
-            white-space: pre-wrap;   /* preserve \n and wrap long lines */
+            white-space: pre-wrap;
             tab-size: 4;
+        }
+        .chat-msg img {
+            max-width: 100%;
+            border-radius: 6px;
+            margin-top: 8px;
+            display: block;
         }
         .chat-user {
             background: #e3e8ee;
@@ -136,115 +170,161 @@
             font-size: 0.93em;
             margin-top: 2px;
         }
-        @media (max-width: 600px) {
-            .container {
-                padding: 8px 2px 8px 2px;
-            }
-            .sticky-bar {
-                flex-direction: column;
-                align-items: stretch;
-                gap: 4px;
-            }
-            #promptForm {
-                flex-direction: column;
-                gap: 4px;
-            }
-            button[type="submit"] {
-                width: 100%;
-                height: 32px;
-            }
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Ollama LLM Interface</h1>
         <div class="sticky-bar">
-            <div id="modelSelector">
-                <h3>Model:</h3>
-                <select id="selectedModel">
-                    <!-- Models will be populated here -->
-                </select>
+            <div class="controls-grid">
+                <div id="modelSelector">
+                    <h3>Model:</h3>
+                    <select id="selectedModel"></select>
+                </div>
+                <form id="promptForm" autocomplete="off">
+                    <textarea id="promptInput" rows="1" placeholder="Type a prompt or paste an image..."></textarea>
+                    <button type="submit">Send</button>
+                </form>
             </div>
-            <form id="promptForm" autocomplete="off">
-                <textarea id="promptInput" rows="1" placeholder="Type your prompt..."></textarea>
-                <button type="submit">Send</button>
-            </form>
+            <div id="imagePreview" style="display: none;">
+                <img id="preview" src="" alt="Image Preview"/>
+                <button id="removeImageBtn" type="button">×</button>
+            </div>
         </div>
         <div id="chatArea"></div>
     </div>
 
     <script>
-    // Store chat history as an array of {role, text, duration}
     let chatHistory = [];
+    let imageToSend = null;
 
     function renderChat() {
         const chatArea = document.getElementById('chatArea');
         chatArea.innerHTML = '';
-        // Render from first to last (top to bottom)
         for (let i = 0; i < chatHistory.length; i++) {
             const msg = chatHistory[i];
             const div = document.createElement('div');
             div.className = 'chat-msg ' + (msg.role === 'user' ? 'chat-user' : 'chat-bot');
-            // Use textContent so tokens with special chars are literal (prevent HTML injection)
-            div.textContent = msg.text + (msg.role === 'bot' && msg.duration ? `\n⏱ ${msg.duration}` : '');
+            
+            if (msg.text) {
+                const textNode = document.createTextNode(msg.text);
+                div.appendChild(textNode);
+            }
+
+            if (msg.image) {
+                const img = document.createElement('img');
+                img.src = msg.image;
+                div.appendChild(img);
+            }
+
+            if (msg.role === 'bot' && msg.duration) {
+                const timerNode = document.createTextNode(`\n⏱ ${msg.duration}`);
+                div.appendChild(timerNode);
+            }
             chatArea.appendChild(div);
         }
     }
 
-    function handleSubmit(event) {
+    async function handleSubmit(event) {
         event.preventDefault();
         const promptInput = document.getElementById('promptInput');
         const selectedModel = document.getElementById('selectedModel').value;
-        if (!promptInput.value.trim()) return;
+        const promptText = promptInput.value.trim();
 
-        chatHistory.unshift({ role: 'user', text: promptInput.value });
+        if (!promptText && !imageToSend) return;
+
+        chatHistory.unshift({ role: 'user', text: promptText, image: imageToSend });
         renderChat();
 
         let botMsg = { role: 'bot', text: '', duration: null };
         chatHistory.unshift(botMsg);
         renderChat();
 
-        const params = new URLSearchParams({
+        const requestBody = {
             model: selectedModel,
-            prompt: promptInput.value
-        });
-        const evtSource = new EventSource('/api/chat?' + params.toString());
-        const startTime = performance.now();
-
-        evtSource.onmessage = function(event) {
-            try {
-                const chunk = JSON.parse(event.data); // {token:"..."}
-                if (chunk.token) {
-                    botMsg.text += chunk.token;
-                    renderChat();
-                }
-            } catch {
-                // ignore malformed chunk
-            }
+            prompt: promptText,
+            image: imageToSend
         };
 
-        evtSource.addEventListener('done', function(event) {
-            try {
-                const meta = JSON.parse(event.data);
-                const duration = (performance.now() - startTime) / 1000;
-                botMsg.duration = meta.duration || `${duration.toFixed(2)}s`;
-            } catch {
-                const duration = (performance.now() - startTime) / 1000;
-                botMsg.duration = `${duration.toFixed(2)}s`;
-            }
-            renderChat();
-            evtSource.close();
-        });
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
 
-        evtSource.onerror = function() {
+            if (!response.ok) throw new Error(`Server error: ${response.statusText}`);
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n\n');
+                buffer = lines.pop(); // Keep the last, possibly incomplete line
+
+                for (const line of lines) {
+                    if (line.startsWith('data:')) {
+                        try {
+                            const data = JSON.parse(line.substring(5));
+                            if (data.token) {
+                                botMsg.text += data.token;
+                                renderChat();
+                            }
+                        } catch (e) {
+                            console.error("Failed to parse stream data chunk:", line);
+                        }
+                    } else if (line.startsWith('event: done')) {
+                        const dataLine = lines.find(l => l.startsWith('data:'));
+                        if (dataLine) {
+                            try {
+                                const meta = JSON.parse(dataLine.substring(5));
+                                botMsg.duration = meta.duration;
+                                renderChat();
+                            } catch (e) {
+                                console.error("Failed to parse done event:", dataLine);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Fetch error:', error);
             botMsg.text += "\n[Stream error]";
             renderChat();
-            evtSource.close();
-        };
+        }
 
         promptInput.value = '';
+        removeImage();
         autoExpandTextarea(promptInput);
+    }
+
+    function handlePaste(event) {
+        const items = (event.clipboardData || window.clipboardData).items;
+        for (const item of items) {
+            if (item.type.indexOf('image') === 0) {
+                const file = item.getAsFile();
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    imageToSend = e.target.result;
+                    document.getElementById('preview').src = imageToSend;
+                    document.getElementById('imagePreview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+                event.preventDefault();
+                break;
+            }
+        }
+    }
+
+    function removeImage() {
+        imageToSend = null;
+        document.getElementById('preview').src = '';
+        document.getElementById('imagePreview').style.display = 'none';
     }
 
     function initModelSelector() {
@@ -263,8 +343,6 @@
             .catch(error => console.error('Error fetching models:', error));
     }
 
-    // Submit form on Enter, not newline
-    // Auto-expand textarea as you type
     function autoExpandTextarea(el) {
         el.style.height = 'auto';
         el.style.height = (el.scrollHeight) + 'px';
@@ -274,16 +352,18 @@
         initModelSelector();
         const promptInput = document.getElementById('promptInput');
         const promptForm = document.getElementById('promptForm');
+        const removeImageBtn = document.getElementById('removeImageBtn');
+
+        promptInput.addEventListener('paste', handlePaste);
+        removeImageBtn.addEventListener('click', removeImage);
+
         promptInput.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 promptForm.requestSubmit();
             }
         });
-        promptInput.addEventListener('input', function() {
-            autoExpandTextarea(promptInput);
-        });
-        // Initialize height on load
+        promptInput.addEventListener('input', () => autoExpandTextarea(promptInput));
         autoExpandTextarea(promptInput);
         promptForm.addEventListener('submit', handleSubmit);
         renderChat();
