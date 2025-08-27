@@ -159,6 +159,16 @@ func main() {
 		flusher.Flush()
 	})
 
+	http.HandleFunc("/api/clear-history", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		sessionKey := r.RemoteAddr
+		delete(chatHistories, sessionKey)
+		w.WriteHeader(http.StatusOK)
+	})
+
 	http.HandleFunc("/api/tags", ollamaAPIWrapper.GetModels)
 	log.Printf("Starting server on %s", port)
 	http.ListenAndServe(port, nil)

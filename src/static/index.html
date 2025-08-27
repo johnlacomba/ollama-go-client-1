@@ -10,18 +10,51 @@
             padding: 0;
         }
         .container {
-            max-width: 700px;
+            max-width: 1200px;
             margin: 24px auto 0 auto;
             background: #fff;
             border-radius: 10px;
             box-shadow: 0 2px 12px rgba(0,0,0,0.07);
             padding: 18px 18px 18px 18px;
         }
+        /* Tab navigation styles */
+        .tab-nav {
+            overflow: hidden;
+            border-bottom: 1px solid #ccc;
+            margin-bottom: 16px;
+        }
+        .tab-nav button {
+            background-color: inherit;
+            float: left;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 14px 16px;
+            transition: 0.3s;
+            font-size: 1em;
+            border-bottom: 3px solid transparent;
+        }
+        .tab-nav button:hover {
+            background-color: #f1f1f1;
+        }
+        .tab-nav button.active {
+            border-bottom: 3px solid #2a4d69;
+            color: #2a4d69;
+            font-weight: 600;
+        }
+        .tab-content {
+            display: none; /* Hidden by default */
+        }
         h1 {
             color: #2a4d69;
             margin-bottom: 8px;
             letter-spacing: 1px;
             font-size: 1.3em;
+        }
+        /* User-To-Model Styles */
+        #userToModel .container-inner {
+            max-width: 700px;
+            margin: 0 auto;
         }
         .sticky-bar {
             position: sticky;
@@ -170,33 +203,191 @@
             font-size: 0.93em;
             margin-top: 2px;
         }
+
+        /* Model-To-Model Styles */
+        .m2m-container {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        .m2m-selectors-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .m2m-model-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .m2m-model-selector h3 {
+            margin: 0;
+            font-size: 1em;
+            font-weight: 500;
+            color: #4f6d7a;
+            width: 70px;
+        }
+        .m2m-model-selector select {
+            padding: 4px 8px;
+            border-radius: 5px;
+            border: 1px solid #bfc9d1;
+            background: #f0f4f8;
+            color: #2a4d69;
+            font-size: 0.98em;
+            height: 32px;
+            flex: 1;
+        }
+        .m2m-chat-area {
+            min-height: 300px;
+            background: #f8fafc;
+            border-radius: 7px;
+            border: 1px solid #e3e8ee;
+            padding: 10px;
+            margin-bottom: 8px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .m2m-input-group {
+            display: flex;
+            flex-direction: column;
+            margin-top: 12px;
+        }
+        .m2m-input-group label {
+            margin-bottom: 4px;
+            font-weight: 500;
+            color: #4f6d7a;
+        }
+        .m2m-input-group textarea {
+            resize: vertical;
+            border-radius: 6px;
+            border: 1px solid #bfc9d1;
+            padding: 7px 10px;
+            font-size: 1em;
+        }
+        .m2m-controls {
+            margin-top: 16px;
+            text-align: center;
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        .m2m-controls button {
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 20px;
+            font-size: 1em;
+            cursor: pointer;
+        }
+        #m2m-start-btn {
+            background: linear-gradient(90deg, #4f6d7a 0%, #2a4d69 100%);
+        }
+        #m2m-start-btn:hover {
+            background: linear-gradient(90deg, #2a4d69 0%, #4f6d7a 100%);
+        }
+        #m2m-stop-btn {
+            background: #d9534f;
+        }
+        #m2m-stop-btn:hover {
+            background: #c9302c;
+        }
+        .m2m-chat-area .chat-msg {
+            max-width: 80%;
+        }
+        .m2m-chat-area .model-a {
+            background: #d0e6f6;
+            align-self: flex-start;
+        }
+        .m2m-chat-area .model-b {
+            background: #e3e8ee;
+            align-self: flex-end;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Ollama LLM Interface</h1>
-        <div class="sticky-bar">
-            <div class="controls-grid">
-                <div id="modelSelector">
-                    <h3>Model:</h3>
-                    <select id="selectedModel"></select>
+        <!-- Tab Navigation -->
+        <div class="tab-nav">
+            <button class="tab-link active" onclick="openTab(event, 'userToModel')">User-To-Model</button>
+            <button class="tab-link" onclick="openTab(event, 'modelToModel')">Model-To-Model</button>
+        </div>
+
+        <!-- User-To-Model Tab Content -->
+        <div id="userToModel" class="tab-content" style="display: block;">
+            <div class="container-inner">
+                <h1>Ollama LLM Interface</h1>
+                <div class="sticky-bar">
+                    <div class="controls-grid">
+                        <div id="modelSelector">
+                            <h3>Model:</h3>
+                            <select id="selectedModel"></select>
+                        </div>
+                        <form id="promptForm" autocomplete="off">
+                            <textarea id="promptInput" rows="1" placeholder="Type a prompt or paste an image..."></textarea>
+                            <button type="submit">Send</button>
+                        </form>
+                    </div>
+                    <div id="imagePreview" style="display: none;">
+                        <img id="preview" src="" alt="Image Preview"/>
+                        <button id="removeImageBtn" type="button">×</button>
+                    </div>
                 </div>
-                <form id="promptForm" autocomplete="off">
-                    <textarea id="promptInput" rows="1" placeholder="Type a prompt or paste an image..."></textarea>
-                    <button type="submit">Send</button>
-                </form>
-            </div>
-            <div id="imagePreview" style="display: none;">
-                <img id="preview" src="" alt="Image Preview"/>
-                <button id="removeImageBtn" type="button">×</button>
+                <div id="chatArea"></div>
             </div>
         </div>
-        <div id="chatArea"></div>
+
+        <!-- Model-To-Model Tab Content -->
+        <div id="modelToModel" class="tab-content">
+            <div class="m2m-container">
+                <h1>Model-To-Model Interface</h1>
+                <div class="m2m-selectors-container">
+                    <div class="m2m-model-selector">
+                        <h3>Model A:</h3>
+                        <select id="m2m-model-a"></select>
+                    </div>
+                    <div class="m2m-model-selector">
+                        <h3>Model B:</h3>
+                        <select id="m2m-model-b"></select>
+                    </div>
+                </div>
+                <div id="m2m-chat-area" class="m2m-chat-area"></div>
+                <div class="m2m-input-group">
+                    <label for="m2m-initial-prompt">Initial Prompt:</label>
+                    <textarea id="m2m-initial-prompt" rows="3"></textarea>
+                </div>
+                <div class="m2m-controls">
+                    <button id="m2m-start-btn">Start Conversation</button>
+                    <button id="m2m-stop-btn">Stop Chat</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
     let chatHistory = [];
     let imageToSend = null;
+    let m2mChatController = null;
+    let isM2MChatRunning = false;
+
+    function openTab(evt, tabName) {
+        let i, tabcontent, tablinks;
+        tabcontent = document.getElementsByClassName("tab-content");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].style.display = "none";
+        }
+        tablinks = document.getElementsByClassName("tab-link");
+        for (i = 0; i < tablinks.length; i++) {
+            tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
+        document.getElementById(tabName).style.display = "block";
+        evt.currentTarget.className += " active";
+        // Stop M2M chat if user switches tabs
+        if (isM2MChatRunning) {
+            handleM2MStop();
+        }
+    }
 
     function renderChat() {
         const chatArea = document.getElementById('chatArea');
@@ -265,7 +456,7 @@
 
                 buffer += decoder.decode(value, { stream: true });
                 const lines = buffer.split('\n\n');
-                buffer = lines.pop(); // Keep the last, possibly incomplete line
+                buffer = lines.pop();
 
                 for (const line of lines) {
                     if (line.startsWith('data:')) {
@@ -275,9 +466,7 @@
                                 botMsg.text += data.token;
                                 renderChat();
                             }
-                        } catch (e) {
-                            console.error("Failed to parse stream data chunk:", line);
-                        }
+                        } catch (e) { console.error("Failed to parse stream data chunk:", line); }
                     } else if (line.startsWith('event: done')) {
                         const dataLine = lines.find(l => l.startsWith('data:'));
                         if (dataLine) {
@@ -285,9 +474,7 @@
                                 const meta = JSON.parse(dataLine.substring(5));
                                 botMsg.duration = meta.duration;
                                 renderChat();
-                            } catch (e) {
-                                console.error("Failed to parse done event:", dataLine);
-                            }
+                            } catch (e) { console.error("Failed to parse done event:", dataLine); }
                         }
                     }
                 }
@@ -327,18 +514,25 @@
         document.getElementById('imagePreview').style.display = 'none';
     }
 
-    function initModelSelector() {
+    function populateModelSelector(selectorId, models) {
+        const modelSelect = document.getElementById(selectorId);
+        if (!modelSelect) return;
+        modelSelect.innerHTML = "";
+        models.forEach(model => {
+            const option = document.createElement('option');
+            option.value = model;
+            option.textContent = model;
+            modelSelect.appendChild(option);
+        });
+    }
+
+    function initModelSelectors() {
         fetch('/api/tags')
             .then(response => response.json())
             .then(models => {
-                const modelSelect = document.getElementById('selectedModel');
-                modelSelect.innerHTML = "";
-                models.forEach(model => {
-                    const option = document.createElement('option');
-                    option.value = model;
-                    option.textContent = model;
-                    modelSelect.appendChild(option);
-                });
+                populateModelSelector('selectedModel', models);
+                populateModelSelector('m2m-model-a', models);
+                populateModelSelector('m2m-model-b', models);
             })
             .catch(error => console.error('Error fetching models:', error));
     }
@@ -348,11 +542,143 @@
         el.style.height = (el.scrollHeight) + 'px';
     }
 
+    // --- Model-To-Model Logic ---
+
+    function setM2MControlsState(running) {
+        document.getElementById('m2m-start-btn').disabled = running;
+        document.getElementById('m2m-model-a').disabled = running;
+        document.getElementById('m2m-model-b').disabled = running;
+        document.getElementById('m2m-initial-prompt').disabled = running;
+    }
+
+    function renderM2MMessage(modelName, text, side) {
+        const chatArea = document.getElementById('m2m-chat-area');
+        const div = document.createElement('div');
+        div.className = `chat-msg ${side}`;
+        div.textContent = `[${modelName}]:\n${text}`;
+        chatArea.appendChild(div);
+        chatArea.scrollTop = chatArea.scrollHeight;
+        return div; // Return the element so it can be updated
+    }
+
+    async function getFullOllamaResponse(model, prompt, signal, modelName, side) {
+        const requestBody = { model, prompt };
+        let fullResponse = "";
+
+        // Create a placeholder message element in the UI
+        const messageElement = renderM2MMessage(modelName, '', side);
+        const chatArea = document.getElementById('m2m-chat-area');
+
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+            signal: signal,
+        });
+
+        if (!response.ok) throw new Error(`Server error: ${response.statusText}`);
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop();
+
+            for (const line of lines) {
+                if (line.startsWith('data:')) {
+                    try {
+                        const data = JSON.parse(line.substring(5));
+                        if (data.token) {
+                            fullResponse += data.token;
+                            // Update the message element with the new token
+                            messageElement.textContent = `[${modelName}]:\n${fullResponse}`;
+                            chatArea.scrollTop = chatArea.scrollHeight;
+                        }
+                    } catch (e) {
+                        console.error("Failed to parse stream data chunk:", line);
+                    }
+                }
+            }
+        }
+        return fullResponse;
+    }
+
+    async function handleM2MStart() {
+        if (isM2MChatRunning) return;
+
+        const modelA = document.getElementById('m2m-model-a').value;
+        const modelB = document.getElementById('m2m-model-b').value;
+        let nextPrompt = document.getElementById('m2m-initial-prompt').value.trim();
+
+        if (!nextPrompt) {
+            alert("Please enter an initial prompt.");
+            return;
+        }
+
+        isM2MChatRunning = true;
+        setM2MControlsState(true);
+        m2mChatController = new AbortController();
+        const signal = m2mChatController.signal;
+
+        const chatArea = document.getElementById('m2m-chat-area');
+        chatArea.innerHTML = '';
+        renderM2MMessage("Initial Prompt", nextPrompt, 'model-a');
+
+        try {
+            // Use the new dedicated endpoint to clear history for the session.
+            await fetch('/api/clear-history', { method: 'POST', signal });
+        } catch (e) {
+            if (e.name !== 'AbortError') {
+                console.error("Failed to clear history:", e);
+            }
+        }
+
+        try {
+            while (isM2MChatRunning) {
+                // Model A's turn
+                const responseA = await getFullOllamaResponse(modelA, nextPrompt, signal, modelA, 'model-a');
+                if (!isM2MChatRunning) break;
+                nextPrompt = responseA;
+
+                // Model B's turn
+                const responseB = await getFullOllamaResponse(modelB, nextPrompt, signal, modelB, 'model-b');
+                if (!isM2MChatRunning) break;
+                nextPrompt = responseB;
+            }
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                console.log('M2M chat aborted by user.');
+                renderM2MMessage("System", "Conversation stopped.", "model-a");
+            } else {
+                console.error('M2M chat error:', error);
+                renderM2MMessage("System", `Error: ${error.message}`, "model-a");
+            }
+        } finally {
+            handleM2MStop();
+        }
+    }
+
+    function handleM2MStop() {
+        if (m2mChatController) {
+            m2mChatController.abort();
+        }
+        isM2MChatRunning = false;
+        setM2MControlsState(false);
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
-        initModelSelector();
+        initModelSelectors();
         const promptInput = document.getElementById('promptInput');
         const promptForm = document.getElementById('promptForm');
         const removeImageBtn = document.getElementById('removeImageBtn');
+        const m2mStartBtn = document.getElementById('m2m-start-btn');
+        const m2mStopBtn = document.getElementById('m2m-stop-btn');
 
         promptInput.addEventListener('paste', handlePaste);
         removeImageBtn.addEventListener('click', removeImage);
@@ -366,6 +692,10 @@
         promptInput.addEventListener('input', () => autoExpandTextarea(promptInput));
         autoExpandTextarea(promptInput);
         promptForm.addEventListener('submit', handleSubmit);
+        
+        m2mStartBtn.addEventListener('click', handleM2MStart);
+        m2mStopBtn.addEventListener('click', handleM2MStop);
+
         renderChat();
     });
     </script>
