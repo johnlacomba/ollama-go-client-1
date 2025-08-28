@@ -43,8 +43,6 @@ func main() {
 			return
 		}
 
-		startTime := time.Now()
-
 		// Decode the JSON payload from the request body
 		var payload chatRequestPayload
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -123,6 +121,7 @@ func main() {
 		// Stream tokens back to the client
 		scanner := bufio.NewScanner(resp.Body)
 		var assistantMsg string
+		var finalOllamaResponse ollamaAPIWrapper.Response
 		for scanner.Scan() {
 			line := scanner.Bytes()
 			var r ollamaAPIWrapper.Response
@@ -139,6 +138,7 @@ func main() {
 				flusher.Flush()
 			}
 			if r.Done {
+				finalOllamaResponse = r // Capture the final response with all the metrics
 				break
 			}
 		}
@@ -151,8 +151,8 @@ func main() {
 		history = append(history, ollamaAPIWrapper.Message{Role: "assistant", Content: assistantMsg})
 		chatHistories[sessionKey] = history
 
-		// Send the final 'done' event
-		duration := time.Since(startTime)
+		// Send the final 'done' event using the accurate duration from Ollama
+		duration := time.Duration(finalOllamaResponse.TotalDuration)
 		donePayload := struct {
 			Duration string `json:"duration"`
 		}{Duration: duration.String()}
