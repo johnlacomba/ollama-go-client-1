@@ -11,7 +11,8 @@
         }
         body {
             font-family: 'Segoe UI', Arial, sans-serif;
-            background: #f4f7fa;
+            background: #121212; /* Dark background */
+            color: #e0e0e0; /* Light default text */
             display: flex;
             flex-direction: column;
         }
@@ -19,9 +20,9 @@
             width: 100%;
             max-width: 1200px;
             margin: 24px auto;
-            background: #fff;
+            background: #1e1e1e; /* Dark container background */
             border-radius: 10px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.5); /* Adjusted shadow for dark theme */
             padding: 18px;
             display: flex;
             flex-direction: column;
@@ -32,7 +33,7 @@
         /* Tab navigation styles */
         .tab-nav {
             overflow: hidden;
-            border-bottom: 1px solid #ccc;
+            border-bottom: 1px solid #333; /* Darker border */
             margin-bottom: 16px;
             flex-shrink: 0;
         }
@@ -46,13 +47,14 @@
             transition: 0.3s;
             font-size: 1em;
             border-bottom: 3px solid transparent;
+            color: #a0a0a0; /* Lighter text for inactive tabs */
         }
         .tab-nav button:hover {
-            background-color: #f1f1f1;
+            background-color: #2a2a2a; /* Dark hover */
         }
         .tab-nav button.active {
-            border-bottom: 3px solid #2a4d69;
-            color: #2a4d69;
+            border-bottom: 3px solid #4a90e2; /* Brighter blue for active tab */
+            color: #4a90e2; /* Brighter blue for active tab */
             font-weight: 600;
         }
         .tab-content {
@@ -61,7 +63,7 @@
             overflow: hidden;
         }
         h1 {
-            color: #2a4d69;
+            color: #e0e0e0; /* Light text */
             margin-bottom: 8px;
             letter-spacing: 1px;
             font-size: 1.3em;
@@ -85,25 +87,27 @@
         .persistent-prompt-group label {
             margin-bottom: 4px;
             font-weight: 500;
-            color: #4f6d7a;
+            color: #a0a0a0; /* Lighter label text */
             font-size: 0.9em;
         }
         .persistent-prompt-group textarea {
             resize: vertical;
             border-radius: 6px;
-            border: 1px solid #bfc9d1;
+            border: 1px solid #444; /* Darker border */
             padding: 7px 10px;
             font-size: 1em;
             min-height: 32px;
             box-sizing: border-box;
+            background-color: #252526; /* Dark input background */
+            color: #e0e0e0; /* Light input text */
         }
 
         /* User-To-Model Styles */
         .input-bar {
-            background: #fff;
+            background: #1e1e1e; /* Match container background */
             z-index: 10;
             padding-top: 8px;
-            border-top: 1px solid #e3e8ee;
+            border-top: 1px solid #333; /* Darker border */
             flex-shrink: 0;
         }
         .controls-grid {
@@ -120,19 +124,19 @@
         }
         #modelSelector h3 {
             margin: 0;
-            color: #4f6d7a;
+            color: #a0a0a0; /* Lighter text */
             font-size: 1em;
             font-weight: 500;
         }
         #selectedModel {
             padding: 4px 8px;
             border-radius: 5px;
-            border: 1px solid #bfc9d1;
-            background: #f0f4f8;
-            color: #2a4d69;
+            border: 1px solid #444; /* Darker border */
+            background: #252526; /* Dark select background */
+            color: #e0e0e0; /* Light text */
             font-size: 0.98em;
             height: 32px;
-            /* Truncate long model names */
+            /* Restore truncation for long model names */
             max-width: 250px;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -153,8 +157,8 @@
             position: absolute;
             top: -8px;
             right: -8px;
-            background: #fff;
-            border: 1px solid #bfc9d1;
+            background: #333; /* Dark background */
+            border: 1px solid #555; /* Darker border */
             border-radius: 50%;
             width: 20px;
             height: 20px;
@@ -163,6 +167,7 @@
             line-height: 18px;
             text-align: center;
             padding: 0;
+            color: #e0e0e0; /* Light text */
         }
         #promptForm {
             display: flex;
@@ -174,22 +179,22 @@
             flex: 1;
             resize: none;
             border-radius: 6px;
-            border: 1px solid #bfc9d1;
+            border: 1px solid #444; /* Darker border */
             padding: 7px 10px;
             font-size: 1em;
-            background: #f8fafc;
-            color: #2a4d69;
+            background: #252526; /* Dark input background */
+            color: #e0e0e0; /* Light text */
             min-height: 32px;
             max-height: 160px;
             box-sizing: border-box;
             overflow-y: auto;
         }
         #promptInput:focus {
-            outline: 2px solid #4f6d7a;
-            background: #fff;
+            outline: 2px solid #4a90e2; /* Brighter focus color */
+            background: #2a2a2a; /* Slightly lighter dark background on focus */
         }
         button[type="submit"] {
-            background: linear-gradient(90deg, #4f6d7a 0%, #2a4d69 100%);
+            background: linear-gradient(90deg, #3a7ab8 0%, #4a90e2 100%); /* Brighter blue gradient */
             color: #fff;
             border: none;
             border-radius: 6px;
@@ -201,14 +206,14 @@
             min-width: 80px;
         }
         button[type="submit"]:hover {
-            background: linear-gradient(90deg, #2a4d69 0%, #4f6d7a 100%);
+            background: linear-gradient(90deg, #4a90e2 0%, #3a7ab8 100%); /* Reversed gradient on hover */
         }
         #chatArea {
-            background: #f8fafc;
+            background: #252526; /* Dark chat background */
             border-radius: 7px;
-            border: 1px solid #e3e8ee;
+            border: 1px solid #333; /* Darker border */
             padding: 10px;
-            color: #222;
+            color: #e0e0e0; /* Light text */
             margin-bottom: 14px;
             font-size: 1.02em;
             line-height: 1.4;
@@ -236,14 +241,14 @@
             display: block;
         }
         .chat-user {
-            background: #e3e8ee;
+            background: #3a3d40; /* Darker user chat bubble */
             align-self: flex-end;
-            color: #2a4d69;
+            color: #e0e0e0; /* Light text */
         }
         .chat-bot {
-            background: #d0e6f6;
+            background: #2a4d69; /* Kept the blue, but it's a dark blue */
             align-self: flex-start;
-            color: #222;
+            color: #e0e0e0; /* Light text */
         }
         .blinking-cursor {
             animation: blink 1s step-end infinite;
@@ -253,11 +258,11 @@
                 color: transparent;
             }
             50% {
-                color: #222; /* Same as .chat-bot text color */
+                color: #e0e0e0; /* Light cursor color */
             }
         }
         .timer {
-            color: #4f6d7a;
+            color: #888; /* Lighter grey for timer */
             font-size: 0.93em;
             margin-top: 2px;
         }
@@ -290,7 +295,7 @@
             flex-shrink: 0;
         }
         .m2m-model-column {
-            border: 1px solid #e3e8ee;
+            border: 1px solid #333; /* Darker border */
             border-radius: 8px;
             padding: 12px;
         }
@@ -303,27 +308,29 @@
             margin: 0;
             font-size: 1em;
             font-weight: 500;
-            color: #4f6d7a;
+            color: #a0a0a0; /* Lighter text */
             width: 70px;
+            flex-shrink: 0;
         }
         .m2m-model-selector select {
             padding: 4px 8px;
             border-radius: 5px;
-            border: 1px solid #bfc9d1;
-            background: #f0f4f8;
-            color: #2a4d69;
+            border: 1px solid #444;
+            background: #252526;
+            color: #e0e0e0;
             font-size: 0.98em;
             height: 32px;
-            flex: 1;
-            /* Truncate long model names */
+            flex-grow: 1;
+            /* This combination enables truncation in a flex container */
+            min-width: 0;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
         #m2m-chat-area {
-            background: #f8fafc;
+            background: #252526; /* Dark chat background */
             border-radius: 7px;
-            border: 1px solid #e3e8ee;
+            border: 1px solid #333; /* Darker border */
             padding: 10px;
             margin-bottom: 8px;
             overflow-y: auto;
@@ -340,14 +347,16 @@
         .m2m-input-group label {
             margin-bottom: 4px;
             font-weight: 500;
-            color: #4f6d7a;
+            color: #a0a0a0; /* Lighter text */
         }
         .m2m-input-group textarea {
             resize: vertical;
             border-radius: 6px;
-            border: 1px solid #bfc9d1;
+            border: 1px solid #444; /* Darker border */
             padding: 7px 10px;
             font-size: 1em;
+            background-color: #252526; /* Dark input background */
+            color: #e0e0e0; /* Light input text */
         }
         .m2m-controls {
             margin-top: 12px; /* Add margin to separate from chat window */
@@ -366,10 +375,10 @@
             cursor: pointer;
         }
         #m2m-start-btn {
-            background: linear-gradient(90deg, #4f6d7a 0%, #2a4d69 100%);
+            background: linear-gradient(90deg, #3a7ab8 0%, #4a90e2 100%); /* Brighter blue gradient */
         }
         #m2m-start-btn:hover {
-            background: linear-gradient(90deg, #2a4d69 0%, #4f6d7a 100%);
+            background: linear-gradient(90deg, #4a90e2 0%, #3a7ab8 100%); /* Reversed gradient */
         }
         #m2m-stop-btn {
             background: #d9534f;
@@ -381,17 +390,17 @@
             max-width: 80%;
         }
         #m2m-chat-area .model-a {
-            background: #d0e6f6;
+            background: #2a4d69; /* Dark blue for model A */
             align-self: flex-start;
         }
         #m2m-chat-area .model-b {
-            background: #e3e8ee;
+            background: #3a3d40; /* Dark grey for model B */
             align-self: flex-end;
         }
         #m2m-chat-area .initial-prompt {
-            background: #fffbe6; /* Light yellow */
-            color: #664d03; /* Dark yellow text */
-            border: 1px solid #ffe58f;
+            background: #4d4a3a; /* Dark yellow */
+            color: #fffbe6; /* Light yellow text */
+            border: 1px solid #8c835b; /* Dark yellow border */
             align-self: center;
             width: 100%;
             max-width: 100%;
@@ -412,7 +421,7 @@
         }
         .slider-group label {
             font-size: 0.9em;
-            color: #4f6d7a;
+            color: #a0a0a0; /* Lighter text */
             width: 120px;
         }
         .slider-group input[type="range"] {
@@ -421,10 +430,12 @@
         }
         .slider-group input[type="number"] {
             width: 60px;
-            border: 1px solid #bfc9d1;
+            border: 1px solid #444; /* Darker border */
             border-radius: 5px;
             padding: 4px;
             font-size: 0.9em;
+            background-color: #252526; /* Dark input background */
+            color: #e0e0e0; /* Light input text */
         }
         /* Hide spin buttons on number inputs */
         .slider-group input[type=number]::-webkit-inner-spin-button, 
