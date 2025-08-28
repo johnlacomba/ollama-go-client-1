@@ -1,6 +1,6 @@
 # Ollama Go Client
 
-This project is a Go client for communicating with a local Ollama LLM (Large Language Model). It provides a web interface to send prompts and receive *streaming* responses from the model.
+This project is a Go client for communicating with a local Ollama LLM (Large Language Model). It provides a web interface with two modes: a standard "User-To-Model" chat and a "Model-To-Model" conversational interface.
 
 ## Project Structure
 
@@ -8,58 +8,67 @@ This project is a Go client for communicating with a local Ollama LLM (Large Lan
 ollama-go-client-1
 ├── src
 │   ├── static
-│   │   └── index.html       # Web UI (SSE streaming)
-│   ├── client
-│   │   └── client.go        # Client wrapper (chat history + request builder)
+│   │   └── index.html       # Web UI for both chat modes
+│   ├── ollamaAPIWrapper
+│   │   └── ollamaAPIWrapper.go # Wrapper for Ollama API calls like listing models
 │   └── server
-│       └── server.go        # HTTP server + /api/chat (SSE) + /api/tags
+│       └── server.go        # HTTP server and API endpoint logic
 ├── go.mod
 └── README.md
 ```
 
 ## Features
 
-- Web-based chat interface.
-- Token-by-token streaming via Server-Sent Events (SSE) from `/api/chat`.
-- Per-session in‑memory chat history (clears on page reload or server restart).
-- Full chat history (including the first two seeded messages) always sent as context.
-- First two seeded messages (system-style priming) are *not* rendered to the user.
-- Model list dynamically loaded from `/api/tags`.
-- Auto-expanding prompt input; Enter submits (Shift+Enter for newline blocked).
-- Lightweight, dependency-free (std lib + Ollama).
+### General
+- **Dual Interfaces**: Switch between a direct chat with a model and a conversation between two models.
+- **Token Streaming**: Responses are streamed token-by-token using Server-Sent Events (SSE).
+- **Dynamic Model Loading**: The list of available models is fetched directly from your local Ollama instance.
+- **In-Memory Chat History**: The server maintains chat history for each user session (keyed by remote address).
+- **Performance Metrics**: Each generated response displays the time it took to generate.
+- **Conditional Auto-Scroll**: The chat window only auto-scrolls if you are already at the bottom, allowing you to scroll up and read previous messages during generation.
+
+### User-To-Model Interface
+- **Standard Chat**: A familiar chat interface for interacting with any available Ollama model.
+- **Image Support**: Paste images directly into the prompt input to conduct multi-modal conversations.
+
+### Model-To-Model Interface
+- **Automated Conversations**: Pit two models against each other, starting with an initial prompt you provide.
+- **Start/Stop Control**: Initiate and terminate the model-to-model conversation at any time.
+- **Clean Sessions**: Each new conversation automatically clears the previous session history on the server.
 
 ## How Streaming Works
 
-1. Browser opens an `EventSource` to:  
-   `GET /api/chat?model=<model>&prompt=<urlencoded prompt>`
-2. Server forwards full chat history + new prompt to Ollama's `/api/chat` with `"stream": true`.
-3. Server streams each partial chunk back as `data:` lines.
-4. A final `event: done` message includes total generation duration.
-5. Frontend accumulates chunks into the latest assistant message.
+1. The browser sends a `POST` request to `/api/chat` with a JSON payload containing the model, prompt, and optional image.
+2. The server forwards the full chat history for the session, plus the new prompt, to Ollama's `/api/chat` endpoint with `"stream": true`.
+3. The server streams each partial chunk from Ollama back to the client as an SSE `data:` line, formatted as a JSON object (e.g., `{"token": "..."}`).
+4. A final `event: done` message is sent, which includes the total generation duration.
+5. The frontend client receives these events, accumulates the tokens into the latest message, and updates the UI in real-time.
 
 ## API Endpoints
 
 - `GET /`  
-  Serves `index.html`.
-- `GET /api/tags`  
-  Returns JSON array of available model names.
-- `GET /api/chat?model=<name>&prompt=<text>`  
-  SSE stream of model output (token chunks). Final event named `done` contains:  
-  `{"duration":"<Go duration string>"}`
+  Serves the main `index.html` application.
 
-Example SSE stream (simplified):
-```
-data: Hel
-data: lo 
-data: world
-event: done
-data: {"duration":"1.237s"}
-```
+- `POST /api/chat`  
+  Accepts a JSON body and initiates an SSE stream for the model's response.
+  - **Request Body**: `{"model": "<name>", "prompt": "<text>", "image": "<base64_string>"}`
+  - **Response Stream**:
+    - `data: {"token":"<chunk>"}`
+    - `event: done\ndata: {"duration":"<Go duration string>"}`
+
+- `POST /api/clear-history`  
+  Clears the chat history for the current user session. No request body needed.
+
+- `GET /api/tags`  
+  Returns a JSON array of available model names from the local Ollama instance.
 
 ## Setup
 
 ```sh
+# Ensure all dependencies are present
 go mod tidy
+
+# Run the server
 go run src/server/server.go
 ```
 
@@ -69,30 +78,17 @@ Ensure Ollama is running locally (default: `http://localhost:11434`).
 
 ## Chat History Behavior
 
-- Stored per remote address only (simple demo approach).
-- Not persisted; restarting or reloading resets context.
-- Hidden seed messages still influence generation.
+- Stored per remote address. This is a simple approach for the demo; multiple users on the same NAT may share history.
+- History is not persisted. Restarting the server clears all chat histories.
+- The Model-To-Model interface automatically calls `/api/clear-history` to ensure each conversation is fresh.
+- An initial two-message history is seeded for new sessions to prime the model, but these messages are not rendered in the UI.
 
 ## Customization
 
-Adjust generation parameters in `server.go` (inside `/api/chat` handler):
-```
-Temperature: 0.7
-TopP:        0.95
-...
-```
-
-Modify initial priming messages in `client.NewClient()`.
-
-## Notes / Future Ideas
-
-- Add real session IDs (e.g., cookie or UUID) instead of `RemoteAddr`.
-- Add per-model independent histories (map[session][model]) if needed.
-- Add cancel support (client closes EventSource).
-- Parameter controls in UI (temperature, top_p, etc.).
-- Persist history (Redis / BoltDB) if required.
+- **Generation Parameters**: Adjust `temperature`, `top_p`, etc., in `src/server/server.go` inside the `/api/chat` handler.
+- **Initial Priming**: Modify the initial seed messages in `src/ollamaAPIWrapper/ollamaAPIWrapper.go` in the `NewClient()` function.
 
 ## Requirements
 
 - Go 1.18+
-- Local Ollama installation
+- A local Ollama installation.
