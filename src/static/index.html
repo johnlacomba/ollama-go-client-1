@@ -240,6 +240,17 @@
             align-self: flex-start;
             color: #222;
         }
+        .blinking-cursor {
+            animation: blink 1s step-end infinite;
+        }
+        @keyframes blink {
+            from, to {
+                color: transparent;
+            }
+            50% {
+                color: #222; /* Same as .chat-bot text color */
+            }
+        }
         .timer {
             color: #4f6d7a;
             font-size: 0.93em;
@@ -466,6 +477,14 @@
                 div.appendChild(textNode);
             }
 
+            // If this is the bot message currently being generated, add a cursor.
+            if (i === chatHistory.length - 1 && msg.role === 'bot' && msg.duration === null) {
+                const cursor = document.createElement('span');
+                cursor.className = 'blinking-cursor';
+                cursor.textContent = '▋';
+                div.appendChild(cursor);
+            }
+
             if (msg.image) {
                 const img = document.createElement('img');
                 img.src = msg.image;
@@ -651,6 +670,12 @@
 
         const messageElement = renderM2MMessage(modelName, '', side);
         const chatArea = document.getElementById('m2m-chat-area');
+        
+        // Add cursor to the newly created message element
+        const cursor = document.createElement('span');
+        cursor.className = 'blinking-cursor';
+        cursor.textContent = '▋';
+        messageElement.appendChild(cursor);
 
         const response = await fetch('/api/chat', {
             method: 'POST',
@@ -681,7 +706,8 @@
                             // Check scroll position before updating content
                             const isScrolledToBottom = chatArea.scrollHeight - chatArea.clientHeight <= chatArea.scrollTop + 10;
                             fullResponse += data.token;
-                            messageElement.textContent = `[${modelName}]:\n${fullResponse}`;
+                            // Update the text content, keeping the cursor at the end
+                            messageElement.childNodes[0].nodeValue = `[${modelName}]:\n${fullResponse}`;
                             // Only auto-scroll if the user was already at the bottom
                             if (isScrolledToBottom) {
                                 chatArea.scrollTop = chatArea.scrollHeight;
@@ -704,6 +730,8 @@
             }
         }
 
+        // Remove cursor and add timer when done
+        messageElement.removeChild(cursor);
         if (duration) {
             const timerNode = document.createTextNode(`\n⏱ ${duration}`);
             messageElement.appendChild(timerNode);
