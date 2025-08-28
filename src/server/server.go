@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strings" // Import strings package
 	"time"
 
@@ -28,21 +27,15 @@ type chatRequestPayload struct {
 }
 
 func main() {
-	// Read index.html content
-	indexHTML, err := os.ReadFile("src/static/index.html")
-	if err != nil {
-		log.Fatal("Error reading index.html:", err)
-	}
-	indexHTMLStr := string(indexHTML)
-
 	endpoint := "http://localhost:11434"
 	timeout := 300 * time.Second
 
-	// Set up HTTP server
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, indexHTMLStr)
-	})
+	// Set up a file server for the 'src/static' directory.
+	// This will serve index.html, style.css, and any other static files.
+	fs := http.FileServer(http.Dir("src/static"))
+	http.Handle("/", fs)
 
+	// API handlers
 	http.HandleFunc("/api/chat", func(w http.ResponseWriter, r *http.Request) {
 		// We must use POST to send a JSON body with an image
 		if r.Method != http.MethodPost {
