@@ -304,6 +304,15 @@
             background: #e3e8ee;
             align-self: flex-end;
         }
+        .m2m-chat-area .initial-prompt {
+            background: #fffbe6; /* Light yellow */
+            color: #664d03; /* Dark yellow text */
+            border: 1px solid #ffe58f;
+            align-self: center;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
     </style>
 </head>
 <body>
@@ -317,7 +326,7 @@
         <!-- User-To-Model Tab Content -->
         <div id="userToModel" class="tab-content" style="display: block;">
             <div class="container-inner">
-                <h1>Ollama LLM Interface</h1>
+                <h1>User-To-Model</h1>
                 <div class="sticky-bar">
                     <div class="controls-grid">
                         <div id="modelSelector">
@@ -341,7 +350,7 @@
         <!-- Model-To-Model Tab Content -->
         <div id="modelToModel" class="tab-content">
             <div class="m2m-container">
-                <h1>Model-To-Model Interface</h1>
+                <h1>Model-To-Model</h1>
                 <div class="m2m-selectors-container">
                     <div class="m2m-model-selector">
                         <h3>Model A:</h3>
@@ -468,13 +477,13 @@
                             }
                         } catch (e) { console.error("Failed to parse stream data chunk:", line); }
                     } else if (line.startsWith('event: done')) {
-                        const dataLine = lines.find(l => l.startsWith('data:'));
-                        if (dataLine) {
+                        const dataPart = line.substring(line.indexOf('data:'));
+                        if (dataPart) {
                             try {
-                                const meta = JSON.parse(dataLine.substring(5));
+                                const meta = JSON.parse(dataPart.substring(5));
                                 botMsg.duration = meta.duration;
                                 renderChat();
-                            } catch (e) { console.error("Failed to parse done event:", dataLine); }
+                            } catch (e) { console.error("Failed to parse done event:", line); }
                         }
                     }
                 }
@@ -556,14 +565,18 @@
         const div = document.createElement('div');
         div.className = `chat-msg ${side}`;
         div.textContent = `[${modelName}]:\n${text}`;
-        chatArea.appendChild(div);
-        chatArea.scrollTop = chatArea.scrollHeight;
+        chatArea.prepend(div); // Prepend to add to the top
+        // No longer need to scroll to bottom
         return div; // Return the element so it can be updated
     }
 
     async function getFullOllamaResponse(model, prompt, signal, modelName, side) {
-        const requestBody = { model, prompt };
+        const requestBody = {
+            model,
+            prompt
+        };
         let fullResponse = "";
+        let duration = null;
 
         // Create a placeholder message element in the UI
         const messageElement = renderM2MMessage(modelName, '', side);
@@ -598,14 +611,30 @@
                             fullResponse += data.token;
                             // Update the message element with the new token
                             messageElement.textContent = `[${modelName}]:\n${fullResponse}`;
-                            chatArea.scrollTop = chatArea.scrollHeight;
                         }
                     } catch (e) {
                         console.error("Failed to parse stream data chunk:", line);
                     }
+                } else if (line.startsWith('event: done')) {
+                    // Correctly parse the data associated with the 'done' event
+                    const dataPart = line.substring(line.indexOf('data:'));
+                    if (dataPart) {
+                        try {
+                            const meta = JSON.parse(dataPart.substring(5));
+                            duration = meta.duration;
+                        } catch (e) {
+                            console.error("Failed to parse done event:", line);
+                        }
+                    }
                 }
             }
         }
+
+        if (duration) {
+            const timerNode = document.createTextNode(`\n⏱ ${duration}`);
+            messageElement.appendChild(timerNode);
+        }
+
         return fullResponse;
     }
 
@@ -628,7 +657,7 @@
 
         const chatArea = document.getElementById('m2m-chat-area');
         chatArea.innerHTML = '';
-        renderM2MMessage("Initial Prompt", nextPrompt, 'model-a');
+        renderM2MMessage("Initial Prompt", nextPrompt, 'initial-prompt');
 
         try {
             // Use the new dedicated endpoint to clear history for the session.
@@ -642,12 +671,12 @@
         try {
             while (isM2MChatRunning) {
                 // Model A's turn
-                const responseA = await getFullOllamaResponse(modelA, nextPrompt, signal, modelA, 'model-a');
+                const responseA = await getFullOllamaResponse(modelA, nextPrompt, signal, "Model A", 'model-a');
                 if (!isM2MChatRunning) break;
                 nextPrompt = responseA;
 
                 // Model B's turn
-                const responseB = await getFullOllamaResponse(modelB, nextPrompt, signal, modelB, 'model-b');
+                const responseB = await getFullOllamaResponse(modelB, nextPrompt, signal, "Model B", 'model-b');
                 if (!isM2MChatRunning) break;
                 nextPrompt = responseB;
             }
