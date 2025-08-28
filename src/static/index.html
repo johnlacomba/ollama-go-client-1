@@ -3,25 +3,38 @@
 <head>
     <title>Ollama LLM Interface</title>
     <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
         body {
             font-family: 'Segoe UI', Arial, sans-serif;
             background: #f4f7fa;
-            margin: 0;
-            padding: 0;
+            display: flex;
+            flex-direction: column;
         }
         .container {
+            width: 100%;
             max-width: 1200px;
-            margin: 24px auto 0 auto;
+            margin: 24px auto;
             background: #fff;
             border-radius: 10px;
             box-shadow: 0 2px 12px rgba(0,0,0,0.07);
-            padding: 18px 18px 18px 18px;
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            height: calc(100vh - 48px);
+            box-sizing: border-box;
         }
         /* Tab navigation styles */
         .tab-nav {
             overflow: hidden;
             border-bottom: 1px solid #ccc;
             margin-bottom: 16px;
+            flex-shrink: 0;
         }
         .tab-nav button {
             background-color: inherit;
@@ -44,25 +57,33 @@
         }
         .tab-content {
             display: none; /* Hidden by default */
+            flex-grow: 1;
+            overflow: hidden;
         }
         h1 {
             color: #2a4d69;
             margin-bottom: 8px;
             letter-spacing: 1px;
             font-size: 1.3em;
+            flex-shrink: 0;
         }
-        /* User-To-Model Styles */
-        #userToModel .container-inner {
+        
+        /* Chat Wrapper Layout */
+        .chat-layout {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
             max-width: 700px;
             margin: 0 auto;
         }
-        .sticky-bar {
-            position: sticky;
-            top: 0;
+
+        /* User-To-Model Styles */
+        .input-bar {
             background: #fff;
             z-index: 10;
-            padding-bottom: 8px;
-            border-bottom: 1px solid #e3e8ee;
+            padding-top: 8px;
+            border-top: 1px solid #e3e8ee;
+            flex-shrink: 0;
         }
         .controls-grid {
             display: flex;
@@ -135,8 +156,7 @@
             min-height: 32px;
             max-height: 160px;
             box-sizing: border-box;
-            overflow-y: hidden;
-            transition: min-height 0.1s;
+            overflow-y: auto;
         }
         #promptInput:focus {
             outline: 2px solid #4f6d7a;
@@ -158,19 +178,20 @@
             background: linear-gradient(90deg, #2a4d69 0%, #4f6d7a 100%);
         }
         #chatArea {
-            min-height: 80px;
             background: #f8fafc;
             border-radius: 7px;
             border: 1px solid #e3e8ee;
-            padding: 10px 10px;
+            padding: 10px;
             color: #222;
-            margin-top: 14px;
+            margin-bottom: 14px;
             font-size: 1.02em;
             line-height: 1.4;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
             gap: 10px;
+            flex-grow: 1;
+            overflow-y: auto;
         }
         .chat-msg {
             margin-bottom: 0;
@@ -205,15 +226,12 @@
         }
 
         /* Model-To-Model Styles */
-        .m2m-container {
-            max-width: 700px;
-            margin: 0 auto;
-        }
         .m2m-selectors-container {
             display: flex;
             flex-direction: column;
             gap: 12px;
             margin-bottom: 16px;
+            flex-shrink: 0;
         }
         .m2m-model-selector {
             display: flex;
@@ -237,8 +255,7 @@
             height: 32px;
             flex: 1;
         }
-        .m2m-chat-area {
-            min-height: 300px;
+        #m2m-chat-area {
             background: #f8fafc;
             border-radius: 7px;
             border: 1px solid #e3e8ee;
@@ -248,6 +265,7 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+            flex-grow: 1;
         }
         .m2m-input-group {
             display: flex;
@@ -293,18 +311,18 @@
         #m2m-stop-btn:hover {
             background: #c9302c;
         }
-        .m2m-chat-area .chat-msg {
+        #m2m-chat-area .chat-msg {
             max-width: 80%;
         }
-        .m2m-chat-area .model-a {
+        #m2m-chat-area .model-a {
             background: #d0e6f6;
             align-self: flex-start;
         }
-        .m2m-chat-area .model-b {
+        #m2m-chat-area .model-b {
             background: #e3e8ee;
             align-self: flex-end;
         }
-        .m2m-chat-area .initial-prompt {
+        #m2m-chat-area .initial-prompt {
             background: #fffbe6; /* Light yellow */
             color: #664d03; /* Dark yellow text */
             border: 1px solid #ffe58f;
@@ -325,9 +343,10 @@
 
         <!-- User-To-Model Tab Content -->
         <div id="userToModel" class="tab-content" style="display: block;">
-            <div class="container-inner">
+            <div class="chat-layout">
                 <h1>User-To-Model</h1>
-                <div class="sticky-bar">
+                <div id="chatArea"></div>
+                <div class="input-bar">
                     <div class="controls-grid">
                         <div id="modelSelector">
                             <h3>Model:</h3>
@@ -343,13 +362,12 @@
                         <button id="removeImageBtn" type="button">×</button>
                     </div>
                 </div>
-                <div id="chatArea"></div>
             </div>
         </div>
 
         <!-- Model-To-Model Tab Content -->
         <div id="modelToModel" class="tab-content">
-            <div class="m2m-container">
+            <div class="chat-layout">
                 <h1>Model-To-Model</h1>
                 <div class="m2m-selectors-container">
                     <div class="m2m-model-selector">
@@ -361,14 +379,16 @@
                         <select id="m2m-model-b"></select>
                     </div>
                 </div>
-                <div id="m2m-chat-area" class="m2m-chat-area"></div>
-                <div class="m2m-input-group">
-                    <label for="m2m-initial-prompt">Initial Prompt:</label>
-                    <textarea id="m2m-initial-prompt" rows="3"></textarea>
-                </div>
-                <div class="m2m-controls">
-                    <button id="m2m-start-btn">Start Conversation</button>
-                    <button id="m2m-stop-btn">Stop Chat</button>
+                <div id="m2m-chat-area"></div>
+                <div class="input-bar">
+                    <div class="m2m-input-group">
+                        <label for="m2m-initial-prompt">Initial Prompt:</label>
+                        <textarea id="m2m-initial-prompt" rows="3"></textarea>
+                    </div>
+                    <div class="m2m-controls">
+                        <button id="m2m-start-btn">Start Conversation</button>
+                        <button id="m2m-stop-btn">Stop Chat</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -392,7 +412,6 @@
         }
         document.getElementById(tabName).style.display = "block";
         evt.currentTarget.className += " active";
-        // Stop M2M chat if user switches tabs
         if (isM2MChatRunning) {
             handleM2MStop();
         }
@@ -423,6 +442,7 @@
             }
             chatArea.appendChild(div);
         }
+        chatArea.scrollTop = chatArea.scrollHeight;
     }
 
     async function handleSubmit(event) {
@@ -433,11 +453,11 @@
 
         if (!promptText && !imageToSend) return;
 
-        chatHistory.unshift({ role: 'user', text: promptText, image: imageToSend });
+        chatHistory.push({ role: 'user', text: promptText, image: imageToSend });
         renderChat();
 
         let botMsg = { role: 'bot', text: '', duration: null };
-        chatHistory.unshift(botMsg);
+        chatHistory.push(botMsg);
         renderChat();
 
         const requestBody = {
@@ -565,20 +585,16 @@
         const div = document.createElement('div');
         div.className = `chat-msg ${side}`;
         div.textContent = `[${modelName}]:\n${text}`;
-        chatArea.prepend(div); // Prepend to add to the top
-        // No longer need to scroll to bottom
-        return div; // Return the element so it can be updated
+        chatArea.appendChild(div);
+        chatArea.scrollTop = chatArea.scrollHeight;
+        return div;
     }
 
     async function getFullOllamaResponse(model, prompt, signal, modelName, side) {
-        const requestBody = {
-            model,
-            prompt
-        };
+        const requestBody = { model, prompt };
         let fullResponse = "";
         let duration = null;
 
-        // Create a placeholder message element in the UI
         const messageElement = renderM2MMessage(modelName, '', side);
         const chatArea = document.getElementById('m2m-chat-area');
 
@@ -609,14 +625,13 @@
                         const data = JSON.parse(line.substring(5));
                         if (data.token) {
                             fullResponse += data.token;
-                            // Update the message element with the new token
                             messageElement.textContent = `[${modelName}]:\n${fullResponse}`;
+                            chatArea.scrollTop = chatArea.scrollHeight;
                         }
                     } catch (e) {
                         console.error("Failed to parse stream data chunk:", line);
                     }
                 } else if (line.startsWith('event: done')) {
-                    // Correctly parse the data associated with the 'done' event
                     const dataPart = line.substring(line.indexOf('data:'));
                     if (dataPart) {
                         try {
@@ -633,6 +648,7 @@
         if (duration) {
             const timerNode = document.createTextNode(`\n⏱ ${duration}`);
             messageElement.appendChild(timerNode);
+            chatArea.scrollTop = chatArea.scrollHeight;
         }
 
         return fullResponse;
@@ -660,7 +676,6 @@
         renderM2MMessage("Initial Prompt", nextPrompt, 'initial-prompt');
 
         try {
-            // Use the new dedicated endpoint to clear history for the session.
             await fetch('/api/clear-history', { method: 'POST', signal });
         } catch (e) {
             if (e.name !== 'AbortError') {
@@ -670,12 +685,10 @@
 
         try {
             while (isM2MChatRunning) {
-                // Model A's turn
                 const responseA = await getFullOllamaResponse(modelA, nextPrompt, signal, "Model A", 'model-a');
                 if (!isM2MChatRunning) break;
                 nextPrompt = responseA;
 
-                // Model B's turn
                 const responseB = await getFullOllamaResponse(modelB, nextPrompt, signal, "Model B", 'model-b');
                 if (!isM2MChatRunning) break;
                 nextPrompt = responseB;
