@@ -132,6 +132,11 @@
             color: #2a4d69;
             font-size: 0.98em;
             height: 32px;
+            /* Truncate long model names */
+            max-width: 250px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         #imagePreview {
             position: relative;
@@ -258,12 +263,36 @@
         }
 
         /* Model-To-Model Styles */
+        .m2m-split-layout {
+            display: flex;
+            gap: 20px;
+            height: 100%;
+        }
+        .m2m-left-panel {
+            width: 450px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto; /* Allow scrolling if content overflows */
+            padding-right: 10px; /* Add some space for the scrollbar */
+        }
+        .m2m-right-panel {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
         .m2m-selectors-container {
             display: flex;
             flex-direction: column;
             gap: 12px;
-            margin-bottom: 16px;
             flex-shrink: 0;
+        }
+        .m2m-model-column {
+            border: 1px solid #e3e8ee;
+            border-radius: 8px;
+            padding: 12px;
         }
         .m2m-model-selector {
             display: flex;
@@ -286,6 +315,10 @@
             font-size: 0.98em;
             height: 32px;
             flex: 1;
+            /* Truncate long model names */
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         #m2m-chat-area {
             background: #f8fafc;
@@ -302,7 +335,7 @@
         .m2m-input-group {
             display: flex;
             flex-direction: column;
-            margin-top: 12px;
+            /* margin-top: 12px; Removed for consistent gap spacing */
         }
         .m2m-input-group label {
             margin-bottom: 4px;
@@ -317,11 +350,12 @@
             font-size: 1em;
         }
         .m2m-controls {
-            margin-top: 16px;
+            margin-top: 12px; /* Add margin to separate from chat window */
             text-align: center;
             display: flex;
             gap: 12px;
             justify-content: center;
+            flex-shrink: 0; /* Prevent buttons from shrinking */
         }
         .m2m-controls button {
             color: #fff;
@@ -363,6 +397,44 @@
             max-width: 100%;
             box-sizing: border-box;
         }
+
+        /* Slider Controls */
+        .options-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 10px 20px;
+            margin-bottom: 12px;
+        }
+        .slider-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .slider-group label {
+            font-size: 0.9em;
+            color: #4f6d7a;
+            width: 120px;
+        }
+        .slider-group input[type="range"] {
+            flex-grow: 1;
+            margin: 0;
+        }
+        .slider-group input[type="number"] {
+            width: 60px;
+            border: 1px solid #bfc9d1;
+            border-radius: 5px;
+            padding: 4px;
+            font-size: 0.9em;
+        }
+        /* Hide spin buttons on number inputs */
+        .slider-group input[type=number]::-webkit-inner-spin-button, 
+        .slider-group input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        .slider-group input[type=number] {
+            -moz-appearance: textfield;
+        }
     </style>
 </head>
 <body>
@@ -379,6 +451,28 @@
                 <h1>User-To-Model</h1>
                 <div id="chatArea"></div>
                 <div class="input-bar">
+                    <div class="options-container">
+                        <div class="slider-group">
+                            <label for="temp-slider">Temperature</label>
+                            <input type="range" id="temp-slider" min="0" max="2" step="0.1" value="0.8">
+                            <input type="number" id="temp-value" min="0" max="2" step="0.1" value="0.8">
+                        </div>
+                        <div class="slider-group">
+                            <label for="top-p-slider">Top P</label>
+                            <input type="range" id="top-p-slider" min="0" max="1" step="0.05" value="0.95">
+                            <input type="number" id="top-p-value" min="0" max="1" step="0.05" value="0.95">
+                        </div>
+                        <div class="slider-group">
+                            <label for="freq-pen-slider">Frequency Penalty</label>
+                            <input type="range" id="freq-pen-slider" min="-2" max="2" step="0.1" value="0.8">
+                            <input type="number" id="freq-pen-value" min="-2" max="2" step="0.1" value="0.8">
+                        </div>
+                        <div class="slider-group">
+                            <label for="pres-pen-slider">Presence Penalty</label>
+                            <input type="range" id="pres-pen-slider" min="-2" max="2" step="0.1" value="0.6">
+                            <input type="number" id="pres-pen-value" min="-2" max="2" step="0.1" value="0.6">
+                        </div>
+                    </div>
                     <div class="persistent-prompt-group">
                         <label for="persistentPromptInput">Persistent Prompt:</label>
                         <textarea id="persistentPromptInput" rows="2" placeholder="This text will be added to the start of every message to the model."></textarea>
@@ -403,32 +497,79 @@
 
         <!-- Model-To-Model Tab Content -->
         <div id="modelToModel" class="tab-content">
-            <div class="chat-layout">
-                <h1>Model-To-Model</h1>
-                <div class="m2m-selectors-container">
-                    <div class="m2m-model-selector">
-                        <h3>Model A:</h3>
-                        <select id="m2m-model-a"></select>
+            <div class="m2m-split-layout">
+                <div class="m2m-left-panel">
+                    <div class="m2m-model-column">
+                        <div class="m2m-model-selector">
+                            <h3>Model A:</h3>
+                            <select id="m2m-model-a"></select>
+                        </div>
+                        <div class="options-container">
+                            <div class="slider-group">
+                                <label for="temp-slider-a">Temperature</label>
+                                <input type="range" id="temp-slider-a" min="0" max="2" step="0.1" value="0.8">
+                                <input type="number" id="temp-value-a" min="0" max="2" step="0.1" value="0.8">
+                            </div>
+                            <div class="slider-group">
+                                <label for="top-p-slider-a">Top P</label>
+                                <input type="range" id="top-p-slider-a" min="0" max="1" step="0.05" value="0.95">
+                                <input type="number" id="top-p-value-a" min="0" max="1" step="0.05" value="0.95">
+                            </div>
+                            <div class="slider-group">
+                                <label for="freq-pen-slider-a">Frequency Penalty</label>
+                                <input type="range" id="freq-pen-slider-a" min="-2" max="2" step="0.1" value="0.8">
+                                <input type="number" id="freq-pen-value-a" min="-2" max="2" step="0.1" value="0.8">
+                            </div>
+                            <div class="slider-group">
+                                <label for="pres-pen-slider-a">Presence Penalty</label>
+                                <input type="range" id="pres-pen-slider-a" min="-2" max="2" step="0.1" value="0.6">
+                                <input type="number" id="pres-pen-value-a" min="-2" max="2" step="0.1" value="0.6">
+                            </div>
+                        </div>
+                        <div class="persistent-prompt-group">
+                            <label for="m2m-persistent-prompt-a">Persistent Prompt:</label>
+                            <textarea id="m2m-persistent-prompt-a" rows="2"></textarea>
+                        </div>
                     </div>
-                    <div class="persistent-prompt-group">
-                        <label for="m2m-persistent-prompt-a">Persistent Prompt:</label>
-                        <textarea id="m2m-persistent-prompt-a" rows="2"></textarea>
+                    <div class="m2m-model-column">
+                        <div class="m2m-model-selector">
+                            <h3>Model B:</h3>
+                            <select id="m2m-model-b"></select>
+                        </div>
+                        <div class="options-container">
+                            <div class="slider-group">
+                                <label for="temp-slider-b">Temperature</label>
+                                <input type="range" id="temp-slider-b" min="0" max="2" step="0.1" value="0.8">
+                                <input type="number" id="temp-value-b" min="0" max="2" step="0.1" value="0.8">
+                            </div>
+                            <div class="slider-group">
+                                <label for="top-p-slider-b">Top P</label>
+                                <input type="range" id="top-p-slider-b" min="0" max="1" step="0.05" value="0.95">
+                                <input type="number" id="top-p-value-b" min="0" max="1" step="0.05" value="0.95">
+                            </div>
+                            <div class="slider-group">
+                                <label for="freq-pen-slider-b">Frequency Penalty</label>
+                                <input type="range" id="freq-pen-slider-b" min="-2" max="2" step="0.1" value="0.8">
+                                <input type="number" id="freq-pen-value-b" min="-2" max="2" step="0.1" value="0.8">
+                            </div>
+                            <div class="slider-group">
+                                <label for="pres-pen-slider-b">Presence Penalty</label>
+                                <input type="range" id="pres-pen-slider-b" min="-2" max="2" step="0.1" value="0.6">
+                                <input type="number" id="pres-pen-value-b" min="-2" max="2" step="0.1" value="0.6">
+                            </div>
+                        </div>
+                        <div class="persistent-prompt-group">
+                            <label for="m2m-persistent-prompt-b">Persistent Prompt:</label>
+                            <textarea id="m2m-persistent-prompt-b" rows="2"></textarea>
+                        </div>
                     </div>
-                    <div class="m2m-model-selector">
-                        <h3>Model B:</h3>
-                        <select id="m2m-model-b"></select>
-                    </div>
-                    <div class="persistent-prompt-group">
-                        <label for="m2m-persistent-prompt-b">Persistent Prompt:</label>
-                        <textarea id="m2m-persistent-prompt-b" rows="2"></textarea>
-                    </div>
-                </div>
-                <div id="m2m-chat-area"></div>
-                <div class="input-bar">
                     <div class="m2m-input-group">
                         <label for="m2m-initial-prompt">Initial Prompt:</label>
                         <textarea id="m2m-initial-prompt" rows="3"></textarea>
                     </div>
+                </div>
+                <div class="m2m-right-panel">
+                    <div id="m2m-chat-area"></div>
                     <div class="m2m-controls">
                         <button id="m2m-start-btn">Start Conversation</button>
                         <button id="m2m-stop-btn">Stop Chat</button>
@@ -463,7 +604,6 @@
 
     function renderChat() {
         const chatArea = document.getElementById('chatArea');
-        // Check if user is scrolled to the bottom before rendering new content
         const isScrolledToBottom = chatArea.scrollHeight - chatArea.clientHeight <= chatArea.scrollTop + 10;
 
         chatArea.innerHTML = '';
@@ -477,7 +617,6 @@
                 div.appendChild(textNode);
             }
 
-            // If this is the bot message currently being generated, add a cursor.
             if (i === chatHistory.length - 1 && msg.role === 'bot' && msg.duration === null) {
                 const cursor = document.createElement('span');
                 cursor.className = 'blinking-cursor';
@@ -498,7 +637,6 @@
             chatArea.appendChild(div);
         }
         
-        // Only auto-scroll if the user was already at the bottom
         if (isScrolledToBottom) {
             chatArea.scrollTop = chatArea.scrollHeight;
         }
@@ -521,13 +659,22 @@
         chatHistory.push(botMsg);
         renderChat();
 
-        // Combine persistent prompt with the user's prompt for the API call
-        const finalPrompt = persistentPrompt ? `${persistentPrompt}\n\n${promptText}` : promptText;
+        // The persistent prompt is no longer combined here. It's sent as a separate field.
+        // const finalPrompt = persistentPrompt ? `${persistentPrompt}\n\n${promptText}` : promptText;
+
+        const options = {
+            temperature: parseFloat(document.getElementById('temp-value').value),
+            top_p: parseFloat(document.getElementById('top-p-value').value),
+            frequency_penalty: parseFloat(document.getElementById('freq-pen-value').value),
+            presence_penalty: parseFloat(document.getElementById('pres-pen-value').value)
+        };
 
         const requestBody = {
             model: selectedModel,
-            prompt: finalPrompt,
-            image: imageToSend
+            prompt: promptText, // Send the clean prompt
+            persistent_prompt: persistentPrompt, // Send the persistent prompt separately
+            image: imageToSend,
+            options: options
         };
 
         try {
@@ -646,7 +793,6 @@
 
     function renderM2MMessage(modelName, text, side) {
         const chatArea = document.getElementById('m2m-chat-area');
-        // Check if user is scrolled to the bottom before adding the new message
         const isScrolledToBottom = chatArea.scrollHeight - chatArea.clientHeight <= chatArea.scrollTop + 10;
 
         const div = document.createElement('div');
@@ -654,24 +800,22 @@
         div.textContent = `[${modelName}]:\n${text}`;
         chatArea.appendChild(div);
 
-        // Only auto-scroll if the user was already at the bottom
         if (isScrolledToBottom) {
             chatArea.scrollTop = chatArea.scrollHeight;
         }
         return div;
     }
 
-    async function getFullOllamaResponse(model, prompt, signal, modelName, side, persistentPrompt) {
-        // Combine persistent prompt with the incoming prompt
-        const finalPrompt = persistentPrompt ? `${persistentPrompt}\n\n${prompt}` : prompt;
-        const requestBody = { model, prompt: finalPrompt };
+    async function getFullOllamaResponse(model, prompt, signal, modelName, side, persistentPrompt, options) {
+        // The persistent prompt is no longer combined here. It's sent as a separate field.
+        // const finalPrompt = persistentPrompt ? `${persistentPrompt}\n\n${prompt}` : prompt;
+        const requestBody = { model, prompt, persistent_prompt: persistentPrompt, options };
         let fullResponse = "";
         let duration = null;
 
         const messageElement = renderM2MMessage(modelName, '', side);
         const chatArea = document.getElementById('m2m-chat-area');
         
-        // Add cursor to the newly created message element
         const cursor = document.createElement('span');
         cursor.className = 'blinking-cursor';
         cursor.textContent = '▋';
@@ -703,12 +847,9 @@
                     try {
                         const data = JSON.parse(line.substring(5));
                         if (data.token) {
-                            // Check scroll position before updating content
                             const isScrolledToBottom = chatArea.scrollHeight - chatArea.clientHeight <= chatArea.scrollTop + 10;
                             fullResponse += data.token;
-                            // Update the text content, keeping the cursor at the end
                             messageElement.childNodes[0].nodeValue = `[${modelName}]:\n${fullResponse}`;
-                            // Only auto-scroll if the user was already at the bottom
                             if (isScrolledToBottom) {
                                 chatArea.scrollTop = chatArea.scrollHeight;
                             }
@@ -730,12 +871,10 @@
             }
         }
 
-        // Remove cursor and add timer when done
         messageElement.removeChild(cursor);
         if (duration) {
             const timerNode = document.createTextNode(`\n⏱ ${duration}`);
             messageElement.appendChild(timerNode);
-            // No need to scroll here, it's handled as tokens arrive
         }
 
         return fullResponse;
@@ -754,6 +893,19 @@
             alert("Please enter an initial prompt.");
             return;
         }
+
+        const optionsA = {
+            temperature: parseFloat(document.getElementById('temp-value-a').value),
+            top_p: parseFloat(document.getElementById('top-p-value-a').value),
+            frequency_penalty: parseFloat(document.getElementById('freq-pen-value-a').value),
+            presence_penalty: parseFloat(document.getElementById('pres-pen-value-a').value)
+        };
+        const optionsB = {
+            temperature: parseFloat(document.getElementById('temp-value-b').value),
+            top_p: parseFloat(document.getElementById('top-p-value-b').value),
+            frequency_penalty: parseFloat(document.getElementById('freq-pen-value-b').value),
+            presence_penalty: parseFloat(document.getElementById('pres-pen-value-b').value)
+        };
 
         isM2MChatRunning = true;
         setM2MControlsState(true);
@@ -774,13 +926,13 @@
 
         try {
             while (isM2MChatRunning) {
-                const responseA = await getFullOllamaResponse(modelA, nextPrompt, signal, "Model A", 'model-a', persistentPromptA);
+                const responseA = await getFullOllamaResponse(modelA, nextPrompt, signal, "Model A", 'model-a', persistentPromptA, optionsA);
                 if (!isM2MChatRunning) break;
-                nextPrompt = responseA;
+                nextPrompt = `Model A: ${responseA}`;
 
-                const responseB = await getFullOllamaResponse(modelB, nextPrompt, signal, "Model B", 'model-b', persistentPromptB);
+                const responseB = await getFullOllamaResponse(modelB, nextPrompt, signal, "Model B", 'model-b', persistentPromptB, optionsB);
                 if (!isM2MChatRunning) break;
-                nextPrompt = responseB;
+                nextPrompt = `Model B: ${responseB}`;
             }
         } catch (error) {
             if (error.name === 'AbortError') {
@@ -801,6 +953,19 @@
         }
         isM2MChatRunning = false;
         setM2MControlsState(false);
+    }
+
+    function setupSliderSync(sliderId, valueId) {
+        const slider = document.getElementById(sliderId);
+        const valueInput = document.getElementById(valueId);
+        if (!slider || !valueInput) return;
+
+        slider.addEventListener('input', () => {
+            valueInput.value = slider.value;
+        });
+        valueInput.addEventListener('change', () => {
+            slider.value = valueInput.value;
+        });
     }
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -826,6 +991,20 @@
         
         m2mStartBtn.addEventListener('click', handleM2MStart);
         m2mStopBtn.addEventListener('click', handleM2MStop);
+
+        // Setup all slider syncs
+        setupSliderSync('temp-slider', 'temp-value');
+        setupSliderSync('top-p-slider', 'top-p-value');
+        setupSliderSync('freq-pen-slider', 'freq-pen-value');
+        setupSliderSync('pres-pen-slider', 'pres-pen-value');
+        setupSliderSync('temp-slider-a', 'temp-value-a');
+        setupSliderSync('top-p-slider-a', 'top-p-value-a');
+        setupSliderSync('freq-pen-slider-a', 'freq-pen-value-a');
+        setupSliderSync('pres-pen-slider-a', 'pres-pen-value-a');
+        setupSliderSync('temp-slider-b', 'temp-value-b');
+        setupSliderSync('top-p-slider-b', 'top-p-value-b');
+        setupSliderSync('freq-pen-slider-b', 'freq-pen-value-b');
+        setupSliderSync('pres-pen-slider-b', 'pres-pen-value-b');
 
         renderChat();
     });

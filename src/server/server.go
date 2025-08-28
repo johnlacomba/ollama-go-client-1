@@ -20,9 +20,11 @@ var chatHistories = make(map[string][]ollamaAPIWrapper.Message)
 
 // Define a struct for the incoming chat request payload
 type chatRequestPayload struct {
-	Model  string `json:"model"`
-	Prompt string `json:"prompt"`
-	Image  string `json:"image,omitempty"` // Base64 encoded image
+	Model            string                   `json:"model"`
+	Prompt           string                   `json:"prompt"`
+	PersistentPrompt string                   `json:"persistent_prompt,omitempty"`
+	Image            string                   `json:"image,omitempty"` // Base64 encoded image
+	Options          ollamaAPIWrapper.Options `json:"options,omitempty"`
 }
 
 func main() {
@@ -72,21 +74,27 @@ func main() {
 			history = ollamaAPIWrapper.NewClient(endpoint, timeout).ChatHistory
 		}
 
-		// Create the user message, with an image if present
-		userMessage := ollamaAPIWrapper.Message{Role: "user", Content: payload.Prompt}
+		// Create the user message that will be saved in the long-term history.
+		// This message is "clean" and does not contain the persistent prompt.
+		historyMessage := ollamaAPIWrapper.Message{Role: "user", Content: payload.Prompt}
 		if payload.Image != "" {
-			// Ollama expects the raw base64 data, so we strip the data URI prefix
-			// e.g., "data:image/png;base64,iVBORw0KGgo..." -> "iVBORw0KGgo..."
 			base64Data := payload.Image
 			if i := strings.Index(base64Data, ","); i != -1 {
 				base64Data = base64Data[i+1:]
 			}
-			userMessage.Images = []string{base64Data}
+			historyMessage.Images = []string{base64Data}
 		}
-		history = append(history, userMessage)
 
-		ollamaClient := ollamaAPIWrapper.NewClient(endpoint, timeout)
-		ollamaClient.ChatHistory = history
+		// For the current API call, create a temporary message that includes the persistent prompt.
+		// This message is NOT saved in the long-term history.
+		promptForOllama := payload.Prompt
+		if payload.PersistentPrompt != "" {
+			promptForOllama = payload.PersistentPrompt + "\n\n" + payload.Prompt
+		}
+		messageForOllama := ollamaAPIWrapper.Message{Role: "user", Content: promptForOllama, Images: historyMessage.Images}
+
+		// The history sent to Ollama includes the long-term history plus the specially crafted message for this turn.
+		messagesForOllama := append(history, messageForOllama)
 
 		// Set headers for SSE streaming
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -102,8 +110,8 @@ func main() {
 		reqBody := ollamaAPIWrapper.Request{
 			Model:          payload.Model,
 			StreamResponse: true,
-			Messages:       ollamaClient.ChatHistory,
-			Options:        ollamaAPIWrapper.Options{Temperature: 0.7, TopP: 0.95},
+			Messages:       messagesForOllama, // Use the temporary, combined message list
+			Options:        payload.Options,   // Use options from the client
 		}
 		body, err := json.Marshal(reqBody)
 		if err != nil {
@@ -145,7 +153,8 @@ func main() {
 			log.Printf("Scanner error: %v", err)
 		}
 
-		// Save the complete assistant response to history
+		// Save the "clean" user message and the assistant's response to the long-term history.
+		history = append(history, historyMessage)
 		history = append(history, ollamaAPIWrapper.Message{Role: "assistant", Content: assistantMsg})
 		chatHistories[sessionKey] = history
 
