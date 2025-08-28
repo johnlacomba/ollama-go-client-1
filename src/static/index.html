@@ -77,6 +77,27 @@
             margin: 0 auto;
         }
 
+        .persistent-prompt-group {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 8px;
+        }
+        .persistent-prompt-group label {
+            margin-bottom: 4px;
+            font-weight: 500;
+            color: #4f6d7a;
+            font-size: 0.9em;
+        }
+        .persistent-prompt-group textarea {
+            resize: vertical;
+            border-radius: 6px;
+            border: 1px solid #bfc9d1;
+            padding: 7px 10px;
+            font-size: 1em;
+            min-height: 32px;
+            box-sizing: border-box;
+        }
+
         /* User-To-Model Styles */
         .input-bar {
             background: #fff;
@@ -347,6 +368,10 @@
                 <h1>User-To-Model</h1>
                 <div id="chatArea"></div>
                 <div class="input-bar">
+                    <div class="persistent-prompt-group">
+                        <label for="persistentPromptInput">Persistent Prompt:</label>
+                        <textarea id="persistentPromptInput" rows="2" placeholder="This text will be added to the start of every message to the model."></textarea>
+                    </div>
                     <div class="controls-grid">
                         <div id="modelSelector">
                             <h3>Model:</h3>
@@ -374,9 +399,17 @@
                         <h3>Model A:</h3>
                         <select id="m2m-model-a"></select>
                     </div>
+                    <div class="persistent-prompt-group">
+                        <label for="m2m-persistent-prompt-a">Persistent Prompt:</label>
+                        <textarea id="m2m-persistent-prompt-a" rows="2"></textarea>
+                    </div>
                     <div class="m2m-model-selector">
                         <h3>Model B:</h3>
                         <select id="m2m-model-b"></select>
+                    </div>
+                    <div class="persistent-prompt-group">
+                        <label for="m2m-persistent-prompt-b">Persistent Prompt:</label>
+                        <textarea id="m2m-persistent-prompt-b" rows="2"></textarea>
                     </div>
                 </div>
                 <div id="m2m-chat-area"></div>
@@ -457,9 +490,11 @@
         const promptInput = document.getElementById('promptInput');
         const selectedModel = document.getElementById('selectedModel').value;
         const promptText = promptInput.value.trim();
+        const persistentPrompt = document.getElementById('persistentPromptInput').value.trim();
 
         if (!promptText && !imageToSend) return;
 
+        // The user-facing chat history should only show the user's direct prompt
         chatHistory.push({ role: 'user', text: promptText, image: imageToSend });
         renderChat();
 
@@ -467,9 +502,12 @@
         chatHistory.push(botMsg);
         renderChat();
 
+        // Combine persistent prompt with the user's prompt for the API call
+        const finalPrompt = persistentPrompt ? `${persistentPrompt}\n\n${promptText}` : promptText;
+
         const requestBody = {
             model: selectedModel,
-            prompt: promptText,
+            prompt: finalPrompt,
             image: imageToSend
         };
 
@@ -604,8 +642,10 @@
         return div;
     }
 
-    async function getFullOllamaResponse(model, prompt, signal, modelName, side) {
-        const requestBody = { model, prompt };
+    async function getFullOllamaResponse(model, prompt, signal, modelName, side, persistentPrompt) {
+        // Combine persistent prompt with the incoming prompt
+        const finalPrompt = persistentPrompt ? `${persistentPrompt}\n\n${prompt}` : prompt;
+        const requestBody = { model, prompt: finalPrompt };
         let fullResponse = "";
         let duration = null;
 
@@ -678,6 +718,8 @@
 
         const modelA = document.getElementById('m2m-model-a').value;
         const modelB = document.getElementById('m2m-model-b').value;
+        const persistentPromptA = document.getElementById('m2m-persistent-prompt-a').value.trim();
+        const persistentPromptB = document.getElementById('m2m-persistent-prompt-b').value.trim();
         let nextPrompt = document.getElementById('m2m-initial-prompt').value.trim();
 
         if (!nextPrompt) {
@@ -704,11 +746,11 @@
 
         try {
             while (isM2MChatRunning) {
-                const responseA = await getFullOllamaResponse(modelA, nextPrompt, signal, "Model A", 'model-a');
+                const responseA = await getFullOllamaResponse(modelA, nextPrompt, signal, "Model A", 'model-a', persistentPromptA);
                 if (!isM2MChatRunning) break;
                 nextPrompt = responseA;
 
-                const responseB = await getFullOllamaResponse(modelB, nextPrompt, signal, "Model B", 'model-b');
+                const responseB = await getFullOllamaResponse(modelB, nextPrompt, signal, "Model B", 'model-b', persistentPromptB);
                 if (!isM2MChatRunning) break;
                 nextPrompt = responseB;
             }

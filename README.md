@@ -21,6 +21,7 @@ ollama-go-client-1
 
 ### General
 - **Dual Interfaces**: Switch between a direct chat with a model and a conversation between two models.
+- **Persistent Prompts**: Set a persistent prompt for each model that is automatically prepended to every message, allowing for easy customization of model behavior (e.g., setting a persona or output format).
 - **Token Streaming**: Responses are streamed token-by-token using Server-Sent Events (SSE).
 - **Dynamic Model Loading**: The list of available models is fetched directly from your local Ollama instance.
 - **In-Memory Chat History**: The server maintains chat history for each user session (keyed by remote address).
