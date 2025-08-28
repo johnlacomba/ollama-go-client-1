@@ -156,7 +156,7 @@ func (c *Client) ListModels() ([]string, error) {
 
 // GetModels returns a list of available Ollama models
 func GetModels(w http.ResponseWriter, r *http.Request) {
-	client := NewClient("http://localhost:11434", 300*time.Second)
+	client := NewClient("http://localhost:11434", 1200*time.Second)
 	models, err := client.ListModels()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
