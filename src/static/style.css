@@ -220,12 +220,16 @@ button[type="submit"]:hover {
     overflow-y: auto;
 }
 .chat-msg {
-    margin-bottom: 0;
     padding: 7px 10px;
     border-radius: 7px;
     max-width: 90%;
+    /* Make the bubble a flex container to control its children */
+    display: flex;
+    flex-direction: column;
+}
+.msg-content {
+    /* These styles now apply to the text part only */
     word-break: break-word;
-    font-size: 1em;
     white-space: pre-wrap;
     tab-size: 4;
 }
@@ -239,11 +243,15 @@ button[type="submit"]:hover {
     background: #3a3d40; /* Darker user chat bubble */
     align-self: flex-end;
     color: #e0e0e0; /* Light text */
+    /* Align content to the start for user messages */
+    align-items: flex-start;
 }
 .chat-bot {
     background: #2a4d69; /* Kept the blue, but it's a dark blue */
     align-self: flex-start;
     color: #e0e0e0; /* Light text */
+    /* Align content to the start for bot messages */
+    align-items: flex-start;
 }
 .blinking-cursor {
     animation: blink 1s step-end infinite;
