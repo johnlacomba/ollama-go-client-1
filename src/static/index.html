@@ -130,15 +130,15 @@
                         </div>
                     </div>
                     <div class="m2m-input-group">
-                        <label for="m2m-initial-prompt">Initial Prompt:</label>
+                        <label for="m2m-initial-prompt">Insert Prompt:</label>
                         <textarea id="m2m-initial-prompt" rows="3"></textarea>
                     </div>
                 </div>
                 <div class="m2m-right-panel">
                     <div id="m2m-chat-area"></div>
                     <div class="m2m-controls">
-                        <button id="m2m-start-btn">Start Conversation</button>
-                        <button id="m2m-stop-btn">Stop Chat</button>
+                        <button id="m2m-start-btn">Insert Prompt</button>
+                        <button id="m2m-stop-btn">Stop</button>
                     </div>
                 </div>
             </div>
@@ -150,6 +150,7 @@
     let imageToSend = null;
     let m2mChatController = null;
     let isM2MChatRunning = false;
+    let pendingM2MPrompt = null;
 
     function openTab(evt, tabName) {
         let i, tabcontent, tablinks;
@@ -178,8 +179,10 @@
             const div = document.createElement('div');
             div.className = 'chat-msg ' + (msg.role === 'user' ? 'chat-user' : 'chat-bot');
             
+            // Restore the use of 'text' property for rendering
             if (msg.text) {
-                const textNode = document.createTextNode(msg.text);
+                const ts = msg.timestamp ? `[${msg.timestamp.toLocaleTimeString()}] ` : '';
+                const textNode = document.createTextNode(ts + msg.text);
                 div.appendChild(textNode);
             }
 
@@ -217,16 +220,13 @@
 
         if (!promptText && !imageToSend) return;
 
-        // The user-facing chat history should only show the user's direct prompt
-        chatHistory.push({ role: 'user', text: promptText, image: imageToSend });
+        // Restore original chat history object structure
+        chatHistory.push({ role: 'user', text: promptText, image: imageToSend, timestamp: new Date() });
         renderChat();
 
-        let botMsg = { role: 'bot', text: '', duration: null };
+        let botMsg = { role: 'bot', text: '', duration: null, timestamp: new Date() };
         chatHistory.push(botMsg);
         renderChat();
-
-        // The persistent prompt is no longer combined here. It's sent as a separate field.
-        // const finalPrompt = persistentPrompt ? `${persistentPrompt}\n\n${promptText}` : promptText;
 
         const options = {
             temperature: parseFloat(document.getElementById('temp-value').value),
@@ -235,10 +235,11 @@
             presence_penalty: parseFloat(document.getElementById('pres-pen-value').value)
         };
 
+        // Restore original request body structure
         const requestBody = {
             model: selectedModel,
-            prompt: promptText, // Send the clean prompt
-            persistent_prompt: persistentPrompt, // Send the persistent prompt separately
+            prompt: promptText,
+            persistent_prompt: persistentPrompt,
             image: imageToSend,
             options: options
         };
@@ -269,7 +270,7 @@
                         try {
                             const data = JSON.parse(line.substring(5));
                             if (data.token) {
-                                botMsg.text += data.token;
+                                botMsg.text += data.token; // Use 'text' property
                                 renderChat();
                             }
                         } catch (e) { console.error("Failed to parse stream data chunk:", line); }
@@ -278,7 +279,11 @@
                         if (dataPart) {
                             try {
                                 const meta = JSON.parse(dataPart.substring(5));
-                                botMsg.duration = meta.duration;
+                                // Find the bot message in history and add duration
+                                const lastMsg = chatHistory[chatHistory.length - 1];
+                                if(lastMsg.role === 'bot') {
+                                    lastMsg.duration = meta.duration;
+                                }
                                 renderChat();
                             } catch (e) { console.error("Failed to parse done event:", line); }
                         }
@@ -351,10 +356,9 @@
     // --- Model-To-Model Logic ---
 
     function setM2MControlsState(running) {
-        document.getElementById('m2m-start-btn').disabled = running;
+        // Only disable the model selectors. The prompt input and button remain active.
         document.getElementById('m2m-model-a').disabled = running;
         document.getElementById('m2m-model-b').disabled = running;
-        document.getElementById('m2m-initial-prompt').disabled = running;
     }
 
     function renderM2MMessage(modelName, text, side) {
@@ -363,7 +367,13 @@
 
         const div = document.createElement('div');
         div.className = `chat-msg ${side}`;
-        div.textContent = `[${modelName}]:\n${text}`;
+        
+        // Create a simple text node for the content, including the model name
+        const ts = `[${new Date().toLocaleTimeString()}]`;
+        const content = `${ts} [${modelName}]:\n${text}`;
+        const textNode = document.createTextNode(content);
+        div.appendChild(textNode);
+
         chatArea.appendChild(div);
 
         if (isScrolledToBottom) {
@@ -373,8 +383,7 @@
     }
 
     async function getFullOllamaResponse(model, prompt, signal, modelName, side, persistentPrompt, options) {
-        // The persistent prompt is no longer combined here. It's sent as a separate field.
-        // const finalPrompt = persistentPrompt ? `${persistentPrompt}\n\n${prompt}` : prompt;
+        // Restore original function signature and logic
         const requestBody = { model, prompt, persistent_prompt: persistentPrompt, options };
         let fullResponse = "";
         let duration = null;
@@ -415,7 +424,8 @@
                         if (data.token) {
                             const isScrolledToBottom = chatArea.scrollHeight - chatArea.clientHeight <= chatArea.scrollTop + 10;
                             fullResponse += data.token;
-                            messageElement.childNodes[0].nodeValue = `[${modelName}]:\n${fullResponse}`;
+                            const ts = messageElement.childNodes[0].nodeValue.split(' ')[0];
+                            messageElement.childNodes[0].nodeValue = `${ts} [${modelName}]:\n${fullResponse}`;
                             if (isScrolledToBottom) {
                                 chatArea.scrollTop = chatArea.scrollHeight;
                             }
@@ -447,16 +457,31 @@
     }
 
     async function handleM2MStart() {
-        if (isM2MChatRunning) return;
+        // If chat is already running, this click is to inject a new prompt.
+        if (isM2MChatRunning) {
+            const promptInput = document.getElementById('m2m-initial-prompt');
+            const promptText = promptInput.value.trim();
+            if (promptText && !pendingM2MPrompt) { // Prevent multiple pending prompts
+                pendingM2MPrompt = promptText;
+                const pendingMsgElement = renderM2MMessage("User Prompt (Pending)", pendingM2MPrompt, 'initial-prompt');
+                // Add a class so we can find and update this element later.
+                if (pendingMsgElement) {
+                    pendingMsgElement.classList.add('pending-prompt-msg');
+                }
+                promptInput.value = ''; // Clear the input after submission
+            }
+            return; // Prevent starting a new chat loop
+        }
 
+        // If chat is not running, this is the initial start.
         const modelA = document.getElementById('m2m-model-a').value;
         const modelB = document.getElementById('m2m-model-b').value;
         const persistentPromptA = document.getElementById('m2m-persistent-prompt-a').value.trim();
         const persistentPromptB = document.getElementById('m2m-persistent-prompt-b').value.trim();
-        let nextPrompt = document.getElementById('m2m-initial-prompt').value.trim();
+        let initialPrompt = document.getElementById('m2m-initial-prompt').value.trim();
 
-        if (!nextPrompt) {
-            alert("Please enter an initial prompt.");
+        if (!initialPrompt) {
+            alert("Please enter an initial prompt to start the conversation.");
             return;
         }
 
@@ -480,8 +505,9 @@
 
         const chatArea = document.getElementById('m2m-chat-area');
         chatArea.innerHTML = '';
-        renderM2MMessage("Initial Prompt", nextPrompt, 'initial-prompt');
+        renderM2MMessage("Initial Prompt", initialPrompt, 'initial-prompt');
 
+        // Clear server-side history before starting
         try {
             await fetch('/api/clear-history', { method: 'POST', signal });
         } catch (e) {
@@ -491,14 +517,51 @@
         }
 
         try {
+            // This variable will hold the output of one model to be used as the input for the next
+            let nextPrompt = initialPrompt;
+
             while (isM2MChatRunning) {
+                // Model A's turn
                 const responseA = await getFullOllamaResponse(modelA, nextPrompt, signal, "Model A", 'model-a', persistentPromptA, optionsA);
                 if (!isM2MChatRunning) break;
-                nextPrompt = `Model A: ${responseA}`;
+                nextPrompt = responseA;
 
+                // Check for and inject a user prompt for Model B
+                if (pendingM2MPrompt) {
+                    nextPrompt = pendingM2MPrompt;
+                    const pendingElement = document.querySelector('.pending-prompt-msg');
+                    if (pendingElement) {
+                        // Update the existing message instead of creating a new one
+                        const ts = `[${new Date().toLocaleTimeString()}]`;
+                        pendingElement.childNodes[0].nodeValue = `${ts} [User Prompt]:\n${nextPrompt}`;
+                        pendingElement.classList.remove('pending-prompt-msg');
+                    } else {
+                        // Fallback in case the element wasn't found
+                        renderM2MMessage("User Prompt", nextPrompt, 'initial-prompt');
+                    }
+                    pendingM2MPrompt = null;
+                }
+
+                // Model B's turn
                 const responseB = await getFullOllamaResponse(modelB, nextPrompt, signal, "Model B", 'model-b', persistentPromptB, optionsB);
                 if (!isM2MChatRunning) break;
-                nextPrompt = `Model B: ${responseB}`;
+                nextPrompt = responseB;
+
+                // Check for and inject a user prompt for Model A
+                if (pendingM2MPrompt) {
+                    nextPrompt = pendingM2MPrompt;
+                    const pendingElement = document.querySelector('.pending-prompt-msg');
+                    if (pendingElement) {
+                        // Update the existing message instead of creating a new one
+                        const ts = `[${new Date().toLocaleTimeString()}]`;
+                        pendingElement.childNodes[0].nodeValue = `${ts} [User Prompt]:\n${nextPrompt}`;
+                        pendingElement.classList.remove('pending-prompt-msg');
+                    } else {
+                        // Fallback in case the element wasn't found
+                        renderM2MMessage("User Prompt", nextPrompt, 'initial-prompt');
+                    }
+                    pendingM2MPrompt = null;
+                }
             }
         } catch (error) {
             if (error.name === 'AbortError') {
@@ -509,7 +572,9 @@
                 renderM2MMessage("System", `Error: ${error.message}`, "model-a");
             }
         } finally {
-            handleM2MStop();
+            isM2MChatRunning = false;
+            setM2MControlsState(false);
+            m2mChatController = null;
         }
     }
 
@@ -518,7 +583,6 @@
             m2mChatController.abort();
         }
         isM2MChatRunning = false;
-        setM2MControlsState(false);
     }
 
     function setupSliderSync(sliderId, valueId) {
