@@ -200,8 +200,11 @@
             }
 
             if (msg.role === 'bot' && msg.duration) {
-                const timerNode = document.createTextNode(`\n⏱ ${msg.duration}`);
-                div.appendChild(timerNode);
+                // Create a separate div for the timer and remove the newline character.
+                const timerDiv = document.createElement('div');
+                timerDiv.className = 'timer';
+                timerDiv.textContent = `⏱ ${msg.duration}`;
+                div.appendChild(timerDiv);
             }
             chatArea.appendChild(div);
         }
@@ -449,8 +452,11 @@
 
         messageElement.removeChild(cursor);
         if (duration) {
-            const timerNode = document.createTextNode(`\n⏱ ${duration}`);
-            messageElement.appendChild(timerNode);
+            // Create a separate div for the timer and remove the newline character.
+            const timerDiv = document.createElement('div');
+            timerDiv.className = 'timer';
+            timerDiv.textContent = `⏱ ${duration}`;
+            messageElement.appendChild(timerDiv);
         }
 
         return fullResponse;
@@ -478,12 +484,16 @@
         const modelB = document.getElementById('m2m-model-b').value;
         const persistentPromptA = document.getElementById('m2m-persistent-prompt-a').value.trim();
         const persistentPromptB = document.getElementById('m2m-persistent-prompt-b').value.trim();
-        let initialPrompt = document.getElementById('m2m-initial-prompt').value.trim();
+        const promptInput = document.getElementById('m2m-initial-prompt');
+        let initialPrompt = promptInput.value.trim();
 
         if (!initialPrompt) {
             alert("Please enter an initial prompt to start the conversation.");
             return;
         }
+        
+        // Clear the input after reading the initial prompt
+        promptInput.value = '';
 
         const optionsA = {
             temperature: parseFloat(document.getElementById('temp-value-a').value),
@@ -605,6 +615,7 @@
         const removeImageBtn = document.getElementById('removeImageBtn');
         const m2mStartBtn = document.getElementById('m2m-start-btn');
         const m2mStopBtn = document.getElementById('m2m-stop-btn');
+        const m2mPromptInput = document.getElementById('m2m-initial-prompt');
 
         promptInput.addEventListener('paste', handlePaste);
         removeImageBtn.addEventListener('click', removeImage);
@@ -621,6 +632,14 @@
         
         m2mStartBtn.addEventListener('click', handleM2MStart);
         m2mStopBtn.addEventListener('click', handleM2MStop);
+
+        // Add keydown listener for the M2M prompt input
+        m2mPromptInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault(); // Prevent adding a new line
+                m2mStartBtn.click(); // Trigger the button's click event
+            }
+        });
 
         // Setup all slider syncs
         setupSliderSync('temp-slider', 'temp-value');
