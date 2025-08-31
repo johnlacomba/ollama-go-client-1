@@ -371,11 +371,15 @@
         const div = document.createElement('div');
         div.className = `chat-msg ${side}`;
         
-        // Create a simple text node for the content, including the model name
+        // Use the same structured approach as User-To-Model chat
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'msg-content';
+        
         const ts = `[${new Date().toLocaleTimeString()}]`;
-        const content = `${ts} [${modelName}]:\n${text}`;
-        const textNode = document.createTextNode(content);
-        div.appendChild(textNode);
+        // Trim any trailing whitespace that might cause extra lines
+        const cleanText = text.trim();
+        contentDiv.textContent = `${ts} [${modelName}]: ${cleanText}`;
+        div.appendChild(contentDiv);
 
         chatArea.appendChild(div);
 
@@ -392,12 +396,13 @@
         let duration = null;
 
         const messageElement = renderM2MMessage(modelName, '', side);
+        const contentDiv = messageElement.querySelector('.msg-content');
         const chatArea = document.getElementById('m2m-chat-area');
         
         const cursor = document.createElement('span');
         cursor.className = 'blinking-cursor';
         cursor.textContent = '▋';
-        messageElement.appendChild(cursor);
+        contentDiv.appendChild(cursor);
 
         const response = await fetch('/api/chat', {
             method: 'POST',
@@ -427,8 +432,11 @@
                         if (data.token) {
                             const isScrolledToBottom = chatArea.scrollHeight - chatArea.clientHeight <= chatArea.scrollTop + 10;
                             fullResponse += data.token;
-                            const ts = messageElement.childNodes[0].nodeValue.split(' ')[0];
-                            messageElement.childNodes[0].nodeValue = `${ts} [${modelName}]:\n${fullResponse}`;
+                            const ts = contentDiv.textContent.split(' ')[0];
+                            // Trim the response to remove any trailing whitespace
+                            const cleanResponse = fullResponse.trim();
+                            contentDiv.textContent = `${ts} [${modelName}]: ${cleanResponse}`;
+                            contentDiv.appendChild(cursor); // Re-append cursor after text update
                             if (isScrolledToBottom) {
                                 chatArea.scrollTop = chatArea.scrollHeight;
                             }
@@ -450,16 +458,16 @@
             }
         }
 
-        messageElement.removeChild(cursor);
+        contentDiv.removeChild(cursor);
         if (duration) {
-            // Create a separate div for the timer and remove the newline character.
+            // Create a separate div for the timer
             const timerDiv = document.createElement('div');
             timerDiv.className = 'timer';
             timerDiv.textContent = `⏱ ${duration}`;
             messageElement.appendChild(timerDiv);
         }
 
-        return fullResponse;
+        return fullResponse.trim(); // Return trimmed response
     }
 
     async function handleM2MStart() {
@@ -534,16 +542,17 @@
                 // Model A's turn
                 const responseA = await getFullOllamaResponse(modelA, nextPrompt, signal, "Model A", 'model-a', persistentPromptA, optionsA);
                 if (!isM2MChatRunning) break;
-                nextPrompt = responseA;
+                nextPrompt = responseA.trim(); // Trim the response before using as next prompt
 
                 // Check for and inject a user prompt for Model B
                 if (pendingM2MPrompt) {
-                    nextPrompt = pendingM2MPrompt;
+                    nextPrompt = pendingM2MPrompt.trim();
                     const pendingElement = document.querySelector('.pending-prompt-msg');
                     if (pendingElement) {
                         // Update the existing message instead of creating a new one
+                        const contentDiv = pendingElement.querySelector('.msg-content');
                         const ts = `[${new Date().toLocaleTimeString()}]`;
-                        pendingElement.childNodes[0].nodeValue = `${ts} [User Prompt]:\n${nextPrompt}`;
+                        contentDiv.textContent = `${ts} [User Prompt]: ${nextPrompt}`;
                         pendingElement.classList.remove('pending-prompt-msg');
                     } else {
                         // Fallback in case the element wasn't found
@@ -555,16 +564,17 @@
                 // Model B's turn
                 const responseB = await getFullOllamaResponse(modelB, nextPrompt, signal, "Model B", 'model-b', persistentPromptB, optionsB);
                 if (!isM2MChatRunning) break;
-                nextPrompt = responseB;
+                nextPrompt = responseB.trim(); // Trim the response before using as next prompt
 
                 // Check for and inject a user prompt for Model A
                 if (pendingM2MPrompt) {
-                    nextPrompt = pendingM2MPrompt;
+                    nextPrompt = pendingM2MPrompt.trim();
                     const pendingElement = document.querySelector('.pending-prompt-msg');
                     if (pendingElement) {
                         // Update the existing message instead of creating a new one
+                        const contentDiv = pendingElement.querySelector('.msg-content');
                         const ts = `[${new Date().toLocaleTimeString()}]`;
-                        pendingElement.childNodes[0].nodeValue = `${ts} [User Prompt]:\n${nextPrompt}`;
+                        contentDiv.textContent = `${ts} [User Prompt]: ${nextPrompt}`;
                         pendingElement.classList.remove('pending-prompt-msg');
                     } else {
                         // Fallback in case the element wasn't found
